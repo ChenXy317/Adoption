@@ -1,0 +1,122 @@
+"""
+FastAPI 服务入口 — 网页版 AI 养成游戏。
+
+负责初始化数据库、注册路由并托管前端静态文件。
+"""
+from __future__ import annotations
+
+import logging
+import os
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+
+from ai_client import ai
+from config import ALLOWED_ORIGINS, APP_HOST, APP_PORT, FRONTEND_DIR
+from db import SessionLocal, init_db
+from routes.catalog import router as catalog_router
+from routes.chat import router as chat_router
+from routes.defs import router as defs_router
+from routes.saves import router as saves_router
+from routes.state import router as state_router
+from seeds.loader import apply_seeds
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    session = SessionLocal()
+    try:
+        apply_seeds(session)
+    finally:
+        session.close()
+    logger.info("服务初始化完成")
+    yield
+    await ai.close()
+    logger.info("服务已关闭")
+
+
+app = FastAPI(title="AI 养成游戏", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(saves_router)
+app.include_router(chat_router)
+app.include_router(state_router)
+app.include_router(defs_router)
+app.include_router(catalog_router)
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request, exc: HTTPException):
+    if isinstance(exc.detail, dict) and "code" in exc.detail:
+        return JSONResponse(status_code=exc.status_code, content=exc.detail)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"code": "error", "message": str(exc.detail), "detail": ""},
+    )
+
+
+@app.exception_handler(Exception)
+async def generic_exception_handler(request, exc: Exception):
+    logger.error("Unhandled exception: %s", exc, exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "code": "internal_error",
+            "message": "服务器内部错误",
+            "detail": "",
+        },
+    )
+
+
+dist_dir = FRONTEND_DIR / "dist"
+if dist_dir.is_dir() and any(dist_dir.iterdir()):
+    assets_dir = dist_dir / "assets"
+    if assets_dir.is_dir():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+    logger.info("已挂载前端静态文件: %s", dist_dir)
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def spa_fallback(full_path: str):
+        if full_path.startswith("api/"):
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "not_found", "message": "接口不存在", "detail": ""},
+            )
+        candidate = (dist_dir / full_path).resolve()
+        if (
+            full_path
+            and candidate.is_file()
+            and str(candidate).startswith(str(dist_dir.resolve()))
+        ):
+            return FileResponse(candidate)
+        return FileResponse(dist_dir / "index.html")
+else:
+    logger.info("未找到 frontend/dist，开发时请使用 Vite（默认 5173）")
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    reload_enabled = os.environ.get("UVICORN_RELOAD", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    uvicorn.run("main:app", host=APP_HOST, port=APP_PORT, reload=reload_enabled)

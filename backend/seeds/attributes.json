@@ -1,0 +1,90 @@
+[
+  {
+    "key": "affection",
+    "name": "好感度",
+    "category": "stat",
+    "min": 0,
+    "max": 100,
+    "default_value": 10,
+    "tick_rule": null,
+    "ai_editable": true,
+    "sort": 10
+  },
+  {
+    "key": "trust",
+    "name": "信任",
+    "category": "stat",
+    "min": 0,
+    "max": 100,
+    "default_value": 10,
+    "tick_rule": null,
+    "ai_editable": true,
+    "sort": 20
+  },
+  {
+    "key": "mood",
+    "name": "心情",
+    "category": "stat",
+    "min": 0,
+    "max": 100,
+    "default_value": 60,
+    "tick_rule": {"mode": "regress", "target": 50, "rate_per_hour": 0.5},
+    "ai_editable": true,
+    "sort": 30
+  },
+  {
+    "key": "stamina",
+    "name": "体力",
+    "category": "stat",
+    "min": 0,
+    "max": 100,
+    "default_value": 80,
+    "tick_rule": {"mode": "recover", "amount_per_hour": 2},
+    "ai_editable": true,
+    "sort": 40
+  },
+  {
+    "key": "intimacy",
+    "name": "亲密",
+    "category": "stat",
+    "min": 0,
+    "max": 100,
+    "default_value": 0,
+    "tick_rule": null,
+    "ai_editable": true,
+    "sort": 50
+  },
+  {
+    "key": "dependence",
+    "name": "依赖",
+    "category": "stat",
+    "min": 0,
+    "max": 100,
+    "default_value": 0,
+    "tick_rule": null,
+    "ai_editable": true,
+    "sort": 60
+  },
+  {
+    "key": "vigilance",
+    "name": "警戒",
+    "category": "stat",
+    "min": 0,
+    "max": 100,
+    "default_value": 30,
+    "tick_rule": {"mode": "decay", "amount_per_hour": 1},
+    "ai_editable": true,
+    "sort": 70
+  },
+  {
+    "key": "money",
+    "name": "金钱",
+    "category": "resource",
+    "min": 0,
+    "max": 999999999,
+    "default_value": 2000,
+    "tick_rule": null,
+    "ai_editable": false,
+    "sort": 80
+  }
+]
