@@ -3,9 +3,24 @@
     "key": "story_first_morning",
     "name": "第一个早晨",
     "category": "fixed",
-    "trigger": {"all": [{"type": "game_day", "op": ">=", "value": 1}]},
+    "trigger": {
+      "all": [
+        {
+          "type": "game_day",
+          "op": ">=",
+          "value": 1
+        }
+      ]
+    },
     "cost": {},
-    "effects": {"attrs": {"trust": 1}, "flags": {"story_first_morning_done": true}},
+    "effects": {
+      "attrs": {
+        "trust": 1
+      },
+      "flags": {
+        "story_first_morning_done": true
+      }
+    },
     "prompt_template": "雨夜之后的第一天清晨。她比你起得更早，局促地站在厨房门口，手指绞着衣角，小声问你需要她做些什么——她整晚几乎没敢合眼。",
     "once": true,
     "cooldown_minutes": 0,
@@ -16,14 +31,44 @@
     "key": "story_nightmare",
     "name": "噩梦",
     "category": "fixed",
-    "trigger": {"all": [
-      {"type": "flag", "key": "story_first_morning_done", "value": true},
-      {"type": "game_day", "op": ">=", "value": 3},
-      {"type": "attr", "key": "trust", "op": ">=", "value": 18},
-      {"type": "period", "in": ["late_night", "dawn"]}
-    ]},
+    "trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "story_first_morning_done",
+          "value": true
+        },
+        {
+          "type": "game_day",
+          "op": ">=",
+          "value": 3
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 18
+        },
+        {
+          "type": "period",
+          "in": [
+            "late_night",
+            "dawn"
+          ]
+        }
+      ]
+    },
     "cost": {},
-    "effects": {"attrs": {"trust": 3, "dependence": 2, "mood": -8}, "flags": {"story_nightmare_done": true}},
+    "effects": {
+      "attrs": {
+        "trust": 3,
+        "dependence": 2,
+        "mood": -8
+      },
+      "flags": {
+        "story_nightmare_done": true
+      }
+    },
     "prompt_template": "深夜，你被隔壁压抑的哭喊声惊醒。推开门，她蜷缩在床角发抖，额头全是冷汗，嘴里喃喃着「别关我……我会乖的」，还没从梦里醒过来。",
     "once": true,
     "cooldown_minutes": 0,
@@ -34,13 +79,38 @@
     "key": "story_scar",
     "name": "手腕上的疤",
     "category": "fixed",
-    "trigger": {"all": [
-      {"type": "flag", "key": "story_nightmare_done", "value": true},
-      {"type": "attr", "key": "trust", "op": ">=", "value": 32},
-      {"type": "attr", "key": "affection", "op": ">=", "value": 25}
-    ]},
+    "trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "story_nightmare_done",
+          "value": true
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 32
+        },
+        {
+          "type": "attr",
+          "key": "affection",
+          "op": ">=",
+          "value": 25
+        }
+      ]
+    },
     "cost": {},
-    "effects": {"attrs": {"trust": 5, "intimacy": 3, "dependence": 2}, "flags": {"story_scar_done": true}},
+    "effects": {
+      "attrs": {
+        "trust": 5,
+        "intimacy": 3,
+        "dependence": 2
+      },
+      "flags": {
+        "story_scar_done": true
+      }
+    },
     "prompt_template": "收拾碗筷时，她卷起的袖子被水打湿滑了下来，左手腕那道浅浅的旧疤露了出来。她慌忙去拽袖子，指尖抖得厉害，低着头不敢看你，声音几乎听不见：「……很丑吧。是、是以前不小心。」",
     "once": true,
     "cooldown_minutes": 0,
@@ -51,14 +121,45 @@
     "key": "story_promise",
     "name": "不会送你走",
     "category": "fixed",
-    "trigger": {"all": [
-      {"type": "flag", "key": "story_scar_done", "value": true},
-      {"type": "attr", "key": "trust", "op": ">=", "value": 45},
-      {"type": "attr", "key": "affection", "op": ">=", "value": 40},
-      {"type": "attr", "key": "dependence", "op": ">=", "value": 20}
-    ]},
+    "trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "story_scar_done",
+          "value": true
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 45
+        },
+        {
+          "type": "attr",
+          "key": "affection",
+          "op": ">=",
+          "value": 40
+        },
+        {
+          "type": "attr",
+          "key": "dependence",
+          "op": ">=",
+          "value": 20
+        }
+      ]
+    },
     "cost": {},
-    "effects": {"attrs": {"trust": 6, "affection": 5, "dependence": 5, "vigilance": -8}, "flags": {"story_promise_done": true}},
+    "effects": {
+      "attrs": {
+        "trust": 6,
+        "affection": 5,
+        "dependence": 5,
+        "vigilance": -8
+      },
+      "flags": {
+        "story_promise_done": true
+      }
+    },
     "prompt_template": "夜里，她抱着那条旧毯子坐在你的房门口，很久都没有敲门。等你拉开门，她抬起头，眼睛红红的，声音很轻却很认真地开口：「……我是不是，可以一直留在这里？不会被送回去，对吗？」",
     "once": true,
     "cooldown_minutes": 0,
@@ -69,12 +170,31 @@
     "key": "stage_real_name",
     "name": "改口叫你的名字",
     "category": "fixed",
-    "trigger": {"all": [
-      {"type": "flag", "key": "story_first_morning_done", "value": true},
-      {"type": "attr", "key": "trust", "op": ">=", "value": 28}
-    ]},
+    "trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "story_first_morning_done",
+          "value": true
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 28
+        }
+      ]
+    },
     "cost": {},
-    "effects": {"attrs": {"trust": 2, "affection": 2}, "flags": {"stage_real_name_done": true}},
+    "effects": {
+      "attrs": {
+        "trust": 2,
+        "affection": 2
+      },
+      "flags": {
+        "stage_real_name_done": true
+      }
+    },
     "prompt_template": "她今天叫你的时候，忽然没有再停顿着说「您」，而是直接念出了你的名字，念得很慢、很认真，像在确认一件很重要的事。念完她自己先红了脸，飞快地低下头去。",
     "once": true,
     "cooldown_minutes": 0,
@@ -85,12 +205,32 @@
     "key": "stage_first_request",
     "name": "第一次开口要东西",
     "category": "fixed",
-    "trigger": {"all": [
-      {"type": "attr", "key": "trust", "op": ">=", "value": 30},
-      {"type": "attr", "key": "dependence", "op": ">=", "value": 15}
-    ]},
+    "trigger": {
+      "all": [
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 30
+        },
+        {
+          "type": "attr",
+          "key": "dependence",
+          "op": ">=",
+          "value": 15
+        }
+      ]
+    },
     "cost": {},
-    "effects": {"attrs": {"dependence": 3, "affection": 2}, "flags": {"stage_first_request_done": true}},
+    "effects": {
+      "attrs": {
+        "dependence": 3,
+        "affection": 2
+      },
+      "flags": {
+        "stage_first_request_done": true
+      }
+    },
     "prompt_template": "晚饭时她盯着桌上的菜看了很久，攥着筷子，半天才小声吐出一句：「今天的豆腐……可不可以，给我留一点？」说完立刻补充「不行也没关系」，耳朵却悄悄红了——这是她第一次主动开口要什么。",
     "once": true,
     "cooldown_minutes": 0,
@@ -101,13 +241,39 @@
     "key": "stage_ask_hug",
     "name": "想要一个拥抱",
     "category": "fixed",
-    "trigger": {"all": [
-      {"type": "attr", "key": "affection", "op": ">=", "value": 60},
-      {"type": "attr", "key": "intimacy", "op": ">=", "value": 15},
-      {"type": "attr", "key": "dependence", "op": ">=", "value": 35}
-    ]},
+    "trigger": {
+      "all": [
+        {
+          "type": "attr",
+          "key": "affection",
+          "op": ">=",
+          "value": 60
+        },
+        {
+          "type": "attr",
+          "key": "intimacy",
+          "op": ">=",
+          "value": 15
+        },
+        {
+          "type": "attr",
+          "key": "dependence",
+          "op": ">=",
+          "value": 35
+        }
+      ]
+    },
     "cost": {},
-    "effects": {"attrs": {"dependence": 4, "intimacy": 4, "mood": 5}, "flags": {"stage_ask_hug_done": true}},
+    "effects": {
+      "attrs": {
+        "dependence": 4,
+        "intimacy": 4,
+        "mood": 5
+      },
+      "flags": {
+        "stage_ask_hug_done": true
+      }
+    },
     "prompt_template": "她站在你面前，犹豫了很久，最后极轻地拽住你的衣角：「今天……可不可以，抱一下？」声音小得像怕被拒绝，肩膀却已经先靠了过来。",
     "once": true,
     "cooldown_minutes": 0,
@@ -118,12 +284,31 @@
     "key": "random_rain_afternoon",
     "name": "午后的雨",
     "category": "random",
-    "trigger": {"all": [
-      {"type": "period", "in": ["afternoon", "evening"]},
-      {"type": "attr", "key": "trust", "op": ">=", "value": 12}
-    ], "chance": 0.18},
+    "trigger": {
+      "all": [
+        {
+          "type": "period",
+          "in": [
+            "afternoon",
+            "evening"
+          ]
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 12
+        }
+      ],
+      "chance": 0.18
+    },
     "cost": {},
-    "effects": {"attrs": {"mood": 4, "affection": 1}},
+    "effects": {
+      "attrs": {
+        "mood": 4,
+        "affection": 1
+      }
+    },
     "prompt_template": "午后忽然下起雨，雨点敲在窗玻璃上。她趴在窗台看了很久，回头小声说，这样的雨声让她想起被你捡到的那天；说完又立刻低下头，像是怕你觉得她多话。",
     "once": false,
     "cooldown_minutes": 2880,
@@ -134,12 +319,31 @@
     "key": "random_cat_visitor",
     "name": "楼下的猫",
     "category": "random",
-    "trigger": {"all": [
-      {"type": "period", "in": ["morning", "noon"]},
-      {"type": "attr", "key": "mood", "op": ">=", "value": 50}
-    ], "chance": 0.15},
+    "trigger": {
+      "all": [
+        {
+          "type": "period",
+          "in": [
+            "morning",
+            "noon"
+          ]
+        },
+        {
+          "type": "attr",
+          "key": "mood",
+          "op": ">=",
+          "value": 50
+        }
+      ],
+      "chance": 0.15
+    },
     "cost": {},
-    "effects": {"attrs": {"mood": 6, "affection": 1}},
+    "effects": {
+      "attrs": {
+        "mood": 6,
+        "affection": 1
+      }
+    },
     "prompt_template": "楼下那只橘猫又蹲在门口。她蹲下来试探着伸手，猫凑过来蹭了蹭她的指尖。她回头望你，眼睛亮亮的，又很快收敛起来，小声问：「它……是不是不讨厌我？」",
     "once": false,
     "cooldown_minutes": 4320,
@@ -150,12 +354,31 @@
     "key": "random_waiting_light",
     "name": "等你回家",
     "category": "random",
-    "trigger": {"all": [
-      {"type": "period", "in": ["night", "late_night"]},
-      {"type": "attr", "key": "affection", "op": ">=", "value": 20}
-    ], "chance": 0.2},
+    "trigger": {
+      "all": [
+        {
+          "type": "period",
+          "in": [
+            "night",
+            "late_night"
+          ]
+        },
+        {
+          "type": "attr",
+          "key": "affection",
+          "op": ">=",
+          "value": 20
+        }
+      ],
+      "chance": 0.2
+    },
     "cost": {},
-    "effects": {"attrs": {"affection": 1, "dependence": 1}},
+    "effects": {
+      "attrs": {
+        "affection": 1,
+        "dependence": 1
+      }
+    },
     "prompt_template": "你回到家时，玄关的灯亮着，她抱着膝盖坐在门边的小凳上，听到开门声立刻站起来，愣了一秒才说：「你、你回来了。饭在锅里温着……我怕你先回来，没敢关灯。」",
     "once": false,
     "cooldown_minutes": 2880,
@@ -166,12 +389,31 @@
     "key": "random_bad_dream",
     "name": "说梦话",
     "category": "random",
-    "trigger": {"all": [
-      {"type": "period", "in": ["late_night", "dawn"]},
-      {"type": "attr", "key": "trust", "op": ">=", "value": 25}
-    ], "chance": 0.12},
+    "trigger": {
+      "all": [
+        {
+          "type": "period",
+          "in": [
+            "late_night",
+            "dawn"
+          ]
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 25
+        }
+      ],
+      "chance": 0.12
+    },
     "cost": {},
-    "effects": {"attrs": {"dependence": 2, "mood": -3}},
+    "effects": {
+      "attrs": {
+        "dependence": 2,
+        "mood": -3
+      }
+    },
     "prompt_template": "起夜时你听见她房间里有细碎的声音。她没有醒，只是皱着眉说梦话：「……不要关门……我一个人，会怕。」手在被子外面攥得紧紧的，像在抓什么东西。",
     "once": false,
     "cooldown_minutes": 4320,
@@ -182,12 +424,31 @@
     "key": "random_cooking_surprise",
     "name": "偷偷学的菜",
     "category": "random",
-    "trigger": {"all": [
-      {"type": "period", "in": ["noon", "afternoon"]},
-      {"type": "attr", "key": "affection", "op": ">=", "value": 15}
-    ], "chance": 0.15},
+    "trigger": {
+      "all": [
+        {
+          "type": "period",
+          "in": [
+            "noon",
+            "afternoon"
+          ]
+        },
+        {
+          "type": "attr",
+          "key": "affection",
+          "op": ">=",
+          "value": 15
+        }
+      ],
+      "chance": 0.15
+    },
     "cost": {},
-    "effects": {"attrs": {"mood": 3, "affection": 2}},
+    "effects": {
+      "attrs": {
+        "mood": 3,
+        "affection": 2
+      }
+    },
     "prompt_template": "厨房里飘出一股焦味。她端着一盘卖相不太好的菜走出来，手心里全是汗：「我、我照着菜谱试了三次……这次应该是能吃的。你要是不想吃，我倒掉就好。」",
     "once": false,
     "cooldown_minutes": 2880,
@@ -198,12 +459,30 @@
     "key": "random_mending_socks",
     "name": "偷偷缝好的衣服",
     "category": "random",
-    "trigger": {"all": [
-      {"type": "period", "in": ["evening"]},
-      {"type": "attr", "key": "affection", "op": ">=", "value": 30}
-    ], "chance": 0.12},
+    "trigger": {
+      "all": [
+        {
+          "type": "period",
+          "in": [
+            "evening"
+          ]
+        },
+        {
+          "type": "attr",
+          "key": "affection",
+          "op": ">=",
+          "value": 30
+        }
+      ],
+      "chance": 0.12
+    },
     "cost": {},
-    "effects": {"attrs": {"intimacy": 2, "affection": 1}},
+    "effects": {
+      "attrs": {
+        "intimacy": 2,
+        "affection": 1
+      }
+    },
     "prompt_template": "你翻衣柜时发现，那件袖口磨破的旧衬衫被细细地缝好了，针脚很密，有一处歪歪扭扭。回头看见她站在门边，红着脸小声说：「我看你老是穿这件……就、就擅自动了针线，对不起。」",
     "once": false,
     "cooldown_minutes": 4320,
@@ -214,9 +493,25 @@
     "key": "manual_walk",
     "name": "傍晚散步",
     "category": "manual",
-    "trigger": {"all": [{"type": "attr", "key": "trust", "op": ">=", "value": 10}]},
-    "cost": {"time_minutes": 60},
-    "effects": {"attrs": {"mood": 5, "affection": 2}},
+    "trigger": {
+      "all": [
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 10
+        }
+      ]
+    },
+    "cost": {
+      "time_minutes": 60
+    },
+    "effects": {
+      "attrs": {
+        "mood": 5,
+        "affection": 2
+      }
+    },
     "prompt_template": "你带她到楼下走走。她一开始跟在你身后半步远的地方，手不知道往哪里放；走到河边时脚步渐渐慢了下来，偷偷看你的侧脸。",
     "once": false,
     "cooldown_minutes": 1440,
@@ -227,9 +522,27 @@
     "key": "manual_hotpot",
     "name": "一起煮火锅",
     "category": "manual",
-    "trigger": {"all": [{"type": "attr", "key": "trust", "op": ">=", "value": 15}]},
-    "cost": {"money": 80, "time_minutes": 90},
-    "effects": {"attrs": {"mood": 8, "affection": 3, "trust": 1}},
+    "trigger": {
+      "all": [
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 15
+        }
+      ]
+    },
+    "cost": {
+      "money": 80,
+      "time_minutes": 90
+    },
+    "effects": {
+      "attrs": {
+        "mood": 8,
+        "affection": 3,
+        "trust": 1
+      }
+    },
     "prompt_template": "你买了食材回来煮火锅。她负责洗菜，学着你的样子把丸子下进锅里，被溅起的热气吓了一跳，随即忍不住笑出了声——那大概是你第一次听见她笑。",
     "once": false,
     "cooldown_minutes": 4320,
@@ -240,9 +553,26 @@
     "key": "manual_haircut",
     "name": "帮她整理头发",
     "category": "manual",
-    "trigger": {"all": [{"type": "attr", "key": "trust", "op": ">=", "value": 18}]},
-    "cost": {"time_minutes": 90},
-    "effects": {"attrs": {"trust": 3, "intimacy": 2, "mood": 4}},
+    "trigger": {
+      "all": [
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 18
+        }
+      ]
+    },
+    "cost": {
+      "time_minutes": 90
+    },
+    "effects": {
+      "attrs": {
+        "trust": 3,
+        "intimacy": 2,
+        "mood": 4
+      }
+    },
     "prompt_template": "她的头发有些长了，发梢毛躁。你让她坐在椅子上，替她慢慢梳理、修剪。她整个人绷得笔直，耳朵红透了，却一声也没有动，只是小声说：「……谢谢你。」",
     "once": true,
     "cooldown_minutes": 0,
@@ -253,9 +583,27 @@
     "key": "manual_dress_shop",
     "name": "带她买连衣裙",
     "category": "manual",
-    "trigger": {"all": [{"type": "attr", "key": "trust", "op": ">=", "value": 25}]},
-    "cost": {"money": 300, "time_minutes": 150},
-    "effects": {"attrs": {"affection": 4, "intimacy": 3, "mood": 6}},
+    "trigger": {
+      "all": [
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 25
+        }
+      ]
+    },
+    "cost": {
+      "money": 300,
+      "time_minutes": 150
+    },
+    "effects": {
+      "attrs": {
+        "affection": 4,
+        "intimacy": 3,
+        "mood": 6
+      }
+    },
     "prompt_template": "你带她进服装店。她盯着价签连连摆手，说自己的衣服够穿了；你坚持让她试，她换好浅色连衣裙出来时，不太敢照镜子，只是悄悄看你的反应，手指把裙摆攥出了皱。",
     "once": false,
     "cooldown_minutes": 10080,
@@ -266,9 +614,27 @@
     "key": "manual_bookstore",
     "name": "陪她逛书店",
     "category": "manual",
-    "trigger": {"all": [{"type": "attr", "key": "trust", "op": ">=", "value": 20}]},
-    "cost": {"money": 60, "time_minutes": 90},
-    "effects": {"attrs": {"trust": 2, "dependence": 2, "mood": 5}},
+    "trigger": {
+      "all": [
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 20
+        }
+      ]
+    },
+    "cost": {
+      "money": 60,
+      "time_minutes": 90
+    },
+    "effects": {
+      "attrs": {
+        "trust": 2,
+        "dependence": 2,
+        "mood": 5
+      }
+    },
     "prompt_template": "书店里人不多。她在书架前站了很久，最后挑了一本翻旧了的绘本，小声念给你听。念到一半她忽然停住，说自己识字不多，怕你嫌她读得慢。",
     "once": false,
     "cooldown_minutes": 5760,
@@ -279,9 +645,27 @@
     "key": "manual_movie",
     "name": "一起看电影",
     "category": "manual",
-    "trigger": {"all": [{"type": "attr", "key": "trust", "op": ">=", "value": 22}]},
-    "cost": {"money": 60, "time_minutes": 150},
-    "effects": {"attrs": {"mood": 6, "affection": 3, "trust": 1}},
+    "trigger": {
+      "all": [
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 22
+        }
+      ]
+    },
+    "cost": {
+      "money": 60,
+      "time_minutes": 150
+    },
+    "effects": {
+      "attrs": {
+        "mood": 6,
+        "affection": 3,
+        "trust": 1
+      }
+    },
     "prompt_template": "你们去了电影院。她全程坐得很直，只在片子里的小猫出现时悄悄笑了一声；散场灯亮起，她还有点不好意思：「刚才……我笑出声了吗？」",
     "once": false,
     "cooldown_minutes": 5760,
@@ -292,9 +676,26 @@
     "key": "gift_small",
     "name": "小礼物",
     "category": "manual",
-    "trigger": {"all": [{"type": "attr", "key": "trust", "op": ">=", "value": 8}]},
-    "cost": {"money": 80, "time_minutes": 20},
-    "effects": {"attrs": {"affection": 2, "mood": 3}},
+    "trigger": {
+      "all": [
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 8
+        }
+      ]
+    },
+    "cost": {
+      "money": 80,
+      "time_minutes": 20
+    },
+    "effects": {
+      "attrs": {
+        "affection": 2,
+        "mood": 3
+      }
+    },
     "prompt_template": "你顺路带回来一件小礼物——一条浅色的发绳。她捧着看了很久，小声问「是、是给我的吗」，耳朵悄悄红了，随后把它仔细绕在手腕上，又怕你笑她，赶紧藏进袖子里。",
     "once": false,
     "cooldown_minutes": 1440,
@@ -305,9 +706,29 @@
     "key": "gift_large",
     "name": "大礼物",
     "category": "manual",
-    "trigger": {"all": [{"type": "attr", "key": "trust", "op": ">=", "value": 20}]},
-    "cost": {"money": 300, "time_minutes": 30},
-    "effects": {"attrs": {"affection": 5, "mood": 6}, "flags": {"gift_large_given": true}},
+    "trigger": {
+      "all": [
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 20
+        }
+      ]
+    },
+    "cost": {
+      "money": 300,
+      "time_minutes": 30
+    },
+    "effects": {
+      "attrs": {
+        "affection": 5,
+        "mood": 6
+      },
+      "flags": {
+        "gift_large_given": true
+      }
+    },
     "prompt_template": "你买回一条细细的银项链。她打开盒子的一瞬间愣住了，第一反应竟是摇头说太贵了；你替她戴上，她屏着呼吸一动不敢动，指尖轻轻碰了碰坠子，声音发颤：「我……可以收下吗。」",
     "once": false,
     "cooldown_minutes": 10080,
@@ -318,11 +739,25 @@
     "key": "story_gift_response",
     "name": "她偷偷收好的心意",
     "category": "fixed",
-    "trigger": {"all": [
-      {"type": "flag", "key": "gift_large_given", "value": true}
-    ]},
+    "trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "gift_large_given",
+          "value": true
+        }
+      ]
+    },
     "cost": {},
-    "effects": {"attrs": {"dependence": 2, "trust": 1}, "flags": {"story_gift_response_done": true}},
+    "effects": {
+      "attrs": {
+        "dependence": 2,
+        "trust": 1
+      },
+      "flags": {
+        "story_gift_response_done": true
+      }
+    },
     "prompt_template": "第二天早上，你发现她把那条项链仔细收进了你给她的小布袋里，只在照镜子时偷偷戴上一下又摘下来。见你进来，她慌慌张张把盒子塞回抽屉：「我怕……弄丢了。」",
     "once": true,
     "cooldown_minutes": 0,
@@ -334,8 +769,14 @@
     "name": "便利店打工",
     "category": "work",
     "trigger": {},
-    "cost": {"time_minutes": 240},
-    "effects": {"attrs": {"money": 120}},
+    "cost": {
+      "time_minutes": 240
+    },
+    "effects": {
+      "attrs": {
+        "money": 120
+      }
+    },
     "prompt_template": "你出门去便利店打了四个小时的工：理货、补货、收银，忙到脚不沾地。回来时口袋里多了 120 元。",
     "once": false,
     "cooldown_minutes": 0,
@@ -346,17 +787,1308 @@
     "key": "proactive_evening_message",
     "name": "她的晚间消息",
     "category": "fixed",
-    "trigger": {"all": [
-      {"type": "period", "in": ["night"]},
-      {"type": "hour", "op": ">=", "value": 19},
-      {"type": "attr", "key": "affection", "op": ">=", "value": 15}
-    ]},
+    "trigger": {
+      "all": [
+        {
+          "type": "period",
+          "in": [
+            "night"
+          ]
+        },
+        {
+          "type": "hour",
+          "op": ">=",
+          "value": 19
+        },
+        {
+          "type": "attr",
+          "key": "affection",
+          "op": ">=",
+          "value": 15
+        }
+      ]
+    },
     "cost": {},
-    "effects": {"attrs": {"mood": 2, "affection": 1}},
+    "effects": {
+      "attrs": {
+        "mood": 2,
+        "affection": 1
+      }
+    },
     "prompt_template": "手机亮了一下，是她发来的消息：「……你、你什么时候回来？饭我温在锅里了。要是忙的话……也不用急着回。」",
     "once": false,
     "cooldown_minutes": 2880,
     "priority": 38,
+    "enabled": true
+  },
+  {
+    "key": "story_first_laugh",
+    "name": "第一次大声笑出来",
+    "category": "fixed",
+    "trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "story_promise_done",
+          "value": true
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 48
+        },
+        {
+          "type": "attr",
+          "key": "affection",
+          "op": ">=",
+          "value": 42
+        },
+        {
+          "type": "period",
+          "in": [
+            "afternoon",
+            "evening"
+          ]
+        }
+      ]
+    },
+    "cost": {},
+    "effects": {
+      "attrs": {
+        "mood": 8,
+        "affection": 3,
+        "trust": 2
+      },
+      "flags": {
+        "story_first_laugh_done": true
+      }
+    },
+    "prompt_template": "你讲了件无关紧要的小事，她先是捂住嘴，肩膀却抖了几下——紧接着一声很轻、却真的出了声的笑漏了出来。她自己也愣住，耳朵立刻红透，小声说：「……对不起，我太大声了。」",
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 78,
+    "enabled": true
+  },
+  {
+    "key": "story_cook_together",
+    "name": "一起做成的晚饭",
+    "category": "fixed",
+    "trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "story_promise_done",
+          "value": true
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 50
+        },
+        {
+          "type": "attr",
+          "key": "affection",
+          "op": ">=",
+          "value": 45
+        },
+        {
+          "type": "period",
+          "in": [
+            "evening"
+          ]
+        }
+      ]
+    },
+    "cost": {},
+    "effects": {
+      "attrs": {
+        "trust": 3,
+        "affection": 3,
+        "mood": 6,
+        "intimacy": 2
+      },
+      "flags": {
+        "story_cook_together_done": true
+      }
+    },
+    "prompt_template": "今晚你们分工做了一顿简单的晚饭。她切的葱花有点歪，汤却刚好咸淡适宜。端上桌时她偷偷看你第一口的表情，听见你说好吃，才慢慢把肩膀放松下来，小声说：「……我们做成了。」",
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 77,
+    "enabled": true
+  },
+  {
+    "key": "story_classmate_scare",
+    "name": "街口的旧同学",
+    "category": "fixed",
+    "trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "story_promise_done",
+          "value": true
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 52
+        },
+        {
+          "type": "attr",
+          "key": "vigilance",
+          "op": ">=",
+          "value": 20
+        },
+        {
+          "type": "period",
+          "in": [
+            "afternoon",
+            "evening"
+          ]
+        }
+      ]
+    },
+    "cost": {},
+    "effects": {
+      "attrs": {
+        "mood": -6,
+        "vigilance": 5,
+        "dependence": 3,
+        "trust": 2
+      },
+      "flags": {
+        "story_classmate_scare_done": true
+      }
+    },
+    "prompt_template": "路过街口时，远处有人喊了一个很像她旧名的称呼。她整个人僵住，下意识往你身后半步，手指悄悄抓住你的衣袖。那人走远了，她才喘过气来，声音发紧：「……对不起，我认错了。可是刚才……有点怕。」",
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 76,
+    "enabled": true
+  },
+  {
+    "key": "story_rainy_cling",
+    "name": "雨里回家",
+    "category": "fixed",
+    "trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "story_promise_done",
+          "value": true
+        },
+        {
+          "type": "attr",
+          "key": "affection",
+          "op": ">=",
+          "value": 50
+        },
+        {
+          "type": "attr",
+          "key": "dependence",
+          "op": ">=",
+          "value": 28
+        },
+        {
+          "type": "period",
+          "in": [
+            "evening",
+            "night"
+          ]
+        }
+      ]
+    },
+    "cost": {},
+    "effects": {
+      "attrs": {
+        "intimacy": 3,
+        "dependence": 3,
+        "affection": 2,
+        "mood": 2
+      },
+      "flags": {
+        "story_rainy_cling_done": true
+      }
+    },
+    "prompt_template": "回家路上忽然下起雨，伞下空间很小。她一开始还刻意空开一点距离，雨点打湿肩头后才极轻地靠近你，指尖碰到你的袖口又不敢抓紧。进门后她把湿发拨开，小声说：「……刚才，没有拖累你吧。」",
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 75,
+    "enabled": true
+  },
+  {
+    "key": "story_birthday_cake",
+    "name": "试做的生日蛋糕",
+    "category": "fixed",
+    "trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "story_promise_done",
+          "value": true
+        },
+        {
+          "type": "attr",
+          "key": "affection",
+          "op": ">=",
+          "value": 55
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 55
+        },
+        {
+          "type": "game_day",
+          "op": ">=",
+          "value": 14
+        }
+      ]
+    },
+    "cost": {},
+    "effects": {
+      "attrs": {
+        "affection": 5,
+        "mood": 7,
+        "intimacy": 2,
+        "trust": 2
+      },
+      "flags": {
+        "story_birthday_cake_done": true
+      }
+    },
+    "prompt_template": "你进门时看见桌上摆着一个歪歪扭扭的小蛋糕，奶油边缘塌了一块。她站在旁边，手指上还沾着糖粉：「我、我查了做法……不知道你生日是哪天，就先练习一次。不好吃的话，扔掉也可以。」",
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 74,
+    "enabled": true
+  },
+  {
+    "key": "story_ask_your_day",
+    "name": "先问起你的一天",
+    "category": "fixed",
+    "trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "story_promise_done",
+          "value": true
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 58
+        },
+        {
+          "type": "attr",
+          "key": "affection",
+          "op": ">=",
+          "value": 48
+        },
+        {
+          "type": "period",
+          "in": [
+            "evening",
+            "night"
+          ]
+        }
+      ]
+    },
+    "cost": {},
+    "effects": {
+      "attrs": {
+        "affection": 3,
+        "trust": 2,
+        "dependence": 1
+      },
+      "flags": {
+        "story_ask_your_day_done": true
+      }
+    },
+    "prompt_template": "你刚换鞋，她就端着温好的水走过来，迟疑了一下才开口：「今天……累不累？有没有不顺利的事？」这大概是她第一次不问「我该做什么」，而是先问起你。",
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 73,
+    "enabled": true
+  },
+  {
+    "key": "story_leave_note",
+    "name": "留在桌上的纸条",
+    "category": "fixed",
+    "trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "story_ask_your_day_done",
+          "value": true
+        },
+        {
+          "type": "attr",
+          "key": "affection",
+          "op": ">=",
+          "value": 52
+        },
+        {
+          "type": "period",
+          "in": [
+            "morning",
+            "noon"
+          ]
+        }
+      ]
+    },
+    "cost": {},
+    "effects": {
+      "attrs": {
+        "affection": 2,
+        "intimacy": 2,
+        "mood": 4
+      },
+      "flags": {
+        "story_leave_note_done": true
+      }
+    },
+    "prompt_template": "桌上多了一张对折的纸条，字迹很慢、很用力：「饭在锅里。出门记得带钥匙。——小澄」末尾那个名字写得特别小，像是鼓足勇气才落笔。",
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 72,
+    "enabled": true
+  },
+  {
+    "key": "story_almost_leave",
+    "name": "几乎要走的夜晚",
+    "category": "fixed",
+    "trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "story_promise_done",
+          "value": true
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 60
+        },
+        {
+          "type": "attr",
+          "key": "dependence",
+          "op": ">=",
+          "value": 30
+        },
+        {
+          "type": "attr",
+          "key": "vigilance",
+          "op": ">=",
+          "value": 15
+        },
+        {
+          "type": "period",
+          "in": [
+            "late_night",
+            "night"
+          ]
+        },
+        {
+          "type": "game_day",
+          "op": ">=",
+          "value": 10
+        }
+      ]
+    },
+    "cost": {},
+    "effects": {
+      "attrs": {
+        "trust": 4,
+        "dependence": 4,
+        "affection": 3,
+        "vigilance": -5,
+        "mood": -2
+      },
+      "flags": {
+        "story_almost_leave_done": true
+      }
+    },
+    "prompt_template": "夜里你看见玄关的灯亮着，她的小包放在脚边，像是整理过又犹豫了。她听见脚步声，肩膀一颤，却没有推门。过了很久才低声说：「刚才我想……是不是该走了。可门把在手里，我又放下了。」",
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 79,
+    "enabled": true
+  },
+  {
+    "key": "random_humming_clean",
+    "name": "打扫时轻轻哼歌",
+    "category": "random",
+    "trigger": {
+      "all": [
+        {
+          "type": "period",
+          "in": [
+            "morning",
+            "afternoon"
+          ]
+        },
+        {
+          "type": "attr",
+          "key": "mood",
+          "op": ">=",
+          "value": 45
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 20
+        }
+      ],
+      "chance": 0.16
+    },
+    "cost": {},
+    "effects": {
+      "attrs": {
+        "mood": 4,
+        "affection": 1
+      }
+    },
+    "prompt_template": "她在擦桌子时轻轻哼了一小段不成调的旋律，发现你在听，立刻停住，耳尖发红：「对、对不起……我不是故意吵到你。」",
+    "once": false,
+    "cooldown_minutes": 2880,
+    "priority": 43,
+    "enabled": true
+  },
+  {
+    "key": "random_water_plants",
+    "name": "给窗边的植物浇水",
+    "category": "random",
+    "trigger": {
+      "all": [
+        {
+          "type": "period",
+          "in": [
+            "morning",
+            "noon"
+          ]
+        },
+        {
+          "type": "attr",
+          "key": "affection",
+          "op": ">=",
+          "value": 18
+        }
+      ],
+      "chance": 0.15
+    },
+    "cost": {},
+    "effects": {
+      "attrs": {
+        "mood": 3,
+        "trust": 1
+      }
+    },
+    "prompt_template": "窗边那盆绿植叶子亮亮的。她端着小水壶，浇得很慢，像怕浇多了：「我看它昨天有点蔫……今天好像好一点了。」",
+    "once": false,
+    "cooldown_minutes": 2880,
+    "priority": 41,
+    "enabled": true
+  },
+  {
+    "key": "random_window_rain",
+    "name": "看窗外下雨",
+    "category": "random",
+    "trigger": {
+      "all": [
+        {
+          "type": "period",
+          "in": [
+            "afternoon",
+            "evening"
+          ]
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 15
+        }
+      ],
+      "chance": 0.14
+    },
+    "cost": {},
+    "effects": {
+      "attrs": {
+        "mood": 2,
+        "affection": 1
+      }
+    },
+    "prompt_template": "雨丝斜斜地贴在玻璃上。她抱着膝盖坐在窗边，没有说话，只是偶尔把额头轻轻抵一下玻璃，像在听雨。",
+    "once": false,
+    "cooldown_minutes": 2880,
+    "priority": 40,
+    "enabled": true
+  },
+  {
+    "key": "random_fold_laundry",
+    "name": "叠错的衣服",
+    "category": "random",
+    "trigger": {
+      "all": [
+        {
+          "type": "period",
+          "in": [
+            "afternoon",
+            "evening"
+          ]
+        },
+        {
+          "type": "attr",
+          "key": "affection",
+          "op": ">=",
+          "value": 22
+        }
+      ],
+      "chance": 0.13
+    },
+    "cost": {},
+    "effects": {
+      "attrs": {
+        "mood": 3,
+        "intimacy": 1
+      }
+    },
+    "prompt_template": "沙发上叠好的衣服里，有一件袖口翻到了里面。她发现你在看，赶紧把那件抽出来重折：「我、我还在学……下次会整齐一点。」",
+    "once": false,
+    "cooldown_minutes": 4320,
+    "priority": 39,
+    "enabled": true
+  },
+  {
+    "key": "random_toast_smile",
+    "name": "对着烤面包微笑",
+    "category": "random",
+    "trigger": {
+      "all": [
+        {
+          "type": "period",
+          "in": [
+            "morning",
+            "dawn"
+          ]
+        },
+        {
+          "type": "attr",
+          "key": "mood",
+          "op": ">=",
+          "value": 40
+        }
+      ],
+      "chance": 0.15
+    },
+    "cost": {},
+    "effects": {
+      "attrs": {
+        "mood": 4,
+        "affection": 1
+      }
+    },
+    "prompt_template": "烤面包机「叮」的一声，她把微焦的吐司翻出来，居然对着那两片面色不太均匀的面包轻轻笑了一下。看见你，笑容收了一半，却没完全消失。",
+    "once": false,
+    "cooldown_minutes": 2880,
+    "priority": 38,
+    "enabled": true
+  },
+  {
+    "key": "random_shy_selfie",
+    "name": "害羞的自拍请求",
+    "category": "random",
+    "trigger": {
+      "all": [
+        {
+          "type": "period",
+          "in": [
+            "afternoon",
+            "evening"
+          ]
+        },
+        {
+          "type": "attr",
+          "key": "affection",
+          "op": ">=",
+          "value": 35
+        },
+        {
+          "type": "attr",
+          "key": "intimacy",
+          "op": ">=",
+          "value": 10
+        }
+      ],
+      "chance": 0.1
+    },
+    "cost": {},
+    "effects": {
+      "attrs": {
+        "intimacy": 2,
+        "affection": 2,
+        "mood": 3
+      }
+    },
+    "prompt_template": "她把手机屏幕对着你又收回去，反复几次，才小声说：「可不可以……拍一张？就放在相册里，不要发到别处……」",
+    "once": false,
+    "cooldown_minutes": 5760,
+    "priority": 37,
+    "enabled": true
+  },
+  {
+    "key": "random_couch_nap",
+    "name": "沙发边沿的小憩",
+    "category": "random",
+    "trigger": {
+      "all": [
+        {
+          "type": "period",
+          "in": [
+            "afternoon"
+          ]
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 28
+        },
+        {
+          "type": "attr",
+          "key": "dependence",
+          "op": ">=",
+          "value": 18
+        }
+      ],
+      "chance": 0.12
+    },
+    "cost": {},
+    "effects": {
+      "attrs": {
+        "dependence": 2,
+        "intimacy": 1,
+        "mood": 2
+      }
+    },
+    "prompt_template": "她坐在沙发最边上睡着了，身子几乎不占位置，像随时准备站起来让路。呼吸很轻，手指还松松地搭在自己的衣角上。",
+    "once": false,
+    "cooldown_minutes": 4320,
+    "priority": 36,
+    "enabled": true
+  },
+  {
+    "key": "random_evening_tea",
+    "name": "傍晚的热茶",
+    "category": "random",
+    "trigger": {
+      "all": [
+        {
+          "type": "period",
+          "in": [
+            "evening"
+          ]
+        },
+        {
+          "type": "attr",
+          "key": "affection",
+          "op": ">=",
+          "value": 25
+        }
+      ],
+      "chance": 0.16
+    },
+    "cost": {},
+    "effects": {
+      "attrs": {
+        "mood": 4,
+        "affection": 1,
+        "trust": 1
+      }
+    },
+    "prompt_template": "她把一杯温热的茶放在你手边，杯柄朝外：「不太烫……我试过了。如果你不想喝，放着也没关系。」",
+    "once": false,
+    "cooldown_minutes": 2880,
+    "priority": 35,
+    "enabled": true
+  },
+  {
+    "key": "manual_park_picnic",
+    "name": "公园野餐",
+    "category": "manual",
+    "trigger": {
+      "all": [
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 18
+        }
+      ]
+    },
+    "cost": {
+      "money": 60,
+      "time_minutes": 120
+    },
+    "effects": {
+      "attrs": {
+        "mood": 7,
+        "affection": 3,
+        "trust": 1
+      }
+    },
+    "prompt_template": "公园草坪上人不多。她把便当盒摆得很整齐，自己却只吃了一点，时不时抬头看飞过的鸟，又很快把视线收回来，像怕被人注意。",
+    "once": false,
+    "cooldown_minutes": 5760,
+    "priority": 25,
+    "enabled": true
+  },
+  {
+    "key": "manual_supermarket",
+    "name": "一起去超市",
+    "category": "manual",
+    "trigger": {
+      "all": [
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 16
+        }
+      ]
+    },
+    "cost": {
+      "money": 100,
+      "time_minutes": 90
+    },
+    "effects": {
+      "attrs": {
+        "mood": 5,
+        "affection": 2,
+        "trust": 2
+      },
+      "unlock_scenes": [
+        "shop_supermarket"
+      ],
+      "flags": {
+        "manual_supermarket_done": true
+      }
+    },
+    "prompt_template": "超市货架间，她推着购物车跟在你身后，每拿一样东西都先看价签，再小声问你：「这个……是不是太贵了？」结账时她把零钱数了两遍才敢递出去。",
+    "once": false,
+    "cooldown_minutes": 4320,
+    "priority": 25,
+    "enabled": true
+  },
+  {
+    "key": "manual_arcade",
+    "name": "去游戏厅",
+    "category": "manual",
+    "trigger": {
+      "all": [
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 24
+        },
+        {
+          "type": "attr",
+          "key": "mood",
+          "op": ">=",
+          "value": 40
+        }
+      ]
+    },
+    "cost": {
+      "money": 80,
+      "time_minutes": 90
+    },
+    "effects": {
+      "attrs": {
+        "mood": 8,
+        "affection": 3,
+        "intimacy": 1
+      }
+    },
+    "prompt_template": "抓娃娃机前她紧张得手心出汗，第一次没夹住。第二次夹起一只小小的白兔子时，她先看你，确认你在笑，才敢把娃娃抱进怀里，声音几乎被音乐盖住：「……可以带回去吗。」",
+    "once": false,
+    "cooldown_minutes": 5760,
+    "priority": 24,
+    "enabled": true
+  },
+  {
+    "key": "manual_aquarium",
+    "name": "去水族馆",
+    "category": "manual",
+    "trigger": {
+      "all": [
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 28
+        }
+      ]
+    },
+    "cost": {
+      "money": 160,
+      "time_minutes": 150
+    },
+    "effects": {
+      "attrs": {
+        "mood": 7,
+        "affection": 4,
+        "intimacy": 2,
+        "trust": 1
+      }
+    },
+    "prompt_template": "幽蓝的光线里，鱼群慢慢游过。她站在玻璃前很久，指尖轻轻点了点那条慢吞吞的鱼，回头时眼睛亮了一下，又立刻把话咽回去，只说：「……这里好安静。」",
+    "once": false,
+    "cooldown_minutes": 10080,
+    "priority": 26,
+    "enabled": true
+  },
+  {
+    "key": "manual_night_market",
+    "name": "逛夜市",
+    "category": "manual",
+    "trigger": {
+      "all": [
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 26
+        },
+        {
+          "type": "period",
+          "in": [
+            "evening",
+            "night"
+          ]
+        }
+      ]
+    },
+    "cost": {
+      "money": 90,
+      "time_minutes": 120
+    },
+    "effects": {
+      "attrs": {
+        "mood": 6,
+        "affection": 3,
+        "trust": 1
+      },
+      "unlock_scenes": [
+        "date_night_market"
+      ],
+      "flags": {
+        "manual_night_market_done": true
+      }
+    },
+    "prompt_template": "夜市人声嘈杂，她下意识贴近你半步。烤鱿鱼的香气里，她咬了一小口，眼睛弯了弯，又怕被烫到，赶紧吹了吹。",
+    "once": false,
+    "cooldown_minutes": 5760,
+    "priority": 25,
+    "enabled": true
+  },
+  {
+    "key": "manual_home_movie",
+    "name": "家里盖毯子看电影",
+    "category": "manual",
+    "trigger": {
+      "all": [
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 30
+        },
+        {
+          "type": "attr",
+          "key": "intimacy",
+          "op": ">=",
+          "value": 8
+        }
+      ]
+    },
+    "cost": {
+      "money": 20,
+      "time_minutes": 120
+    },
+    "effects": {
+      "attrs": {
+        "mood": 6,
+        "affection": 3,
+        "intimacy": 3,
+        "dependence": 1
+      }
+    },
+    "prompt_template": "客厅灯关到只剩屏幕光。你把毯子分给她一半，她一开始缩在自己那侧，片子放到一半才悄悄把毯子角拉近一点，没有说话。",
+    "once": false,
+    "cooldown_minutes": 4320,
+    "priority": 23,
+    "enabled": true
+  },
+  {
+    "key": "gift_medium",
+    "name": "中等礼物",
+    "category": "manual",
+    "trigger": {
+      "all": [
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 14
+        }
+      ]
+    },
+    "cost": {
+      "money": 150,
+      "time_minutes": 25
+    },
+    "effects": {
+      "attrs": {
+        "affection": 3,
+        "mood": 4
+      },
+      "flags": {
+        "gift_medium_given": true
+      }
+    },
+    "prompt_template": "你带回一本浅色封面的空白日记本和一支好写的笔。她翻开空白页，指尖停了很久，才小声说：「我可以……写一点今天的事吗。」",
+    "once": false,
+    "cooldown_minutes": 4320,
+    "priority": 27,
+    "enabled": true
+  },
+  {
+    "key": "gift_handmade_return",
+    "name": "她回赠的手工礼物",
+    "category": "fixed",
+    "trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "gift_medium_given",
+          "value": true
+        },
+        {
+          "type": "attr",
+          "key": "affection",
+          "op": ">=",
+          "value": 28
+        }
+      ]
+    },
+    "cost": {},
+    "effects": {
+      "attrs": {
+        "affection": 3,
+        "intimacy": 2,
+        "trust": 2,
+        "mood": 5
+      },
+      "flags": {
+        "gift_handmade_return_done": true
+      }
+    },
+    "prompt_template": "她把一个用旧布条缝成的小袋塞到你手里，针脚有些歪：「里面可以放钥匙……不好看的话，你不用带出去。我只是想……回一点什么。」",
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 53,
+    "enabled": true
+  },
+  {
+    "key": "gift_shared_umbrella",
+    "name": "买一把共用的伞",
+    "category": "manual",
+    "trigger": {
+      "all": [
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 12
+        }
+      ]
+    },
+    "cost": {
+      "money": 45,
+      "time_minutes": 30
+    },
+    "effects": {
+      "attrs": {
+        "affection": 2,
+        "mood": 3,
+        "trust": 1
+      },
+      "flags": {
+        "gift_shared_umbrella_done": true
+      }
+    },
+    "prompt_template": "便利店门口你买了把深色的伞。她摸了摸伞柄，像在确认这是「家里的东西」，小声说：「以后下雨……就不用两个人各自淋着了。」",
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 27,
+    "enabled": true
+  },
+  {
+    "key": "work_cafe",
+    "name": "咖啡馆打工",
+    "category": "work",
+    "trigger": {},
+    "cost": {
+      "time_minutes": 240
+    },
+    "effects": {
+      "attrs": {
+        "money": 130
+      },
+      "advance_minutes": 240
+    },
+    "prompt_template": "你在咖啡馆做了四个小时：擦桌、出餐、对客人点单。回来时口袋里多了 130 元，袖口带着一点咖啡香。",
+    "once": false,
+    "cooldown_minutes": 0,
+    "priority": 15,
+    "enabled": true
+  },
+  {
+    "key": "work_flyer",
+    "name": "发传单",
+    "category": "work",
+    "trigger": {},
+    "cost": {
+      "time_minutes": 180
+    },
+    "effects": {
+      "attrs": {
+        "money": 90
+      },
+      "advance_minutes": 180
+    },
+    "prompt_template": "你在街口站了三个小时发传单，嗓子有点干，回来时口袋里多了 90 元。",
+    "once": false,
+    "cooldown_minutes": 0,
+    "priority": 14,
+    "enabled": true
+  },
+  {
+    "key": "work_tutoring",
+    "name": "家教助教",
+    "category": "work",
+    "trigger": {},
+    "cost": {
+      "time_minutes": 180
+    },
+    "effects": {
+      "attrs": {
+        "money": 150
+      },
+      "advance_minutes": 180
+    },
+    "prompt_template": "你帮忙做了三小时家教助教：对答案、盯作业、讲了一道简单题。回来时口袋里多了 150 元。",
+    "once": false,
+    "cooldown_minutes": 0,
+    "priority": 15,
+    "enabled": true
+  },
+  {
+    "key": "crisis_door_lock",
+    "name": "门锁卡住的片刻",
+    "category": "fixed",
+    "trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "story_promise_done",
+          "value": true
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 40
+        },
+        {
+          "type": "period",
+          "in": [
+            "evening",
+            "night"
+          ]
+        },
+        {
+          "type": "game_day",
+          "op": ">=",
+          "value": 7
+        }
+      ]
+    },
+    "cost": {},
+    "effects": {
+      "attrs": {
+        "mood": -10,
+        "vigilance": 8,
+        "dependence": 3,
+        "trust": 2
+      },
+      "flags": {
+        "crisis_door_lock_done": true
+      },
+      "unlock_scenes": [
+        "care_panic_comfort"
+      ]
+    },
+    "prompt_template": "进门时门锁忽然卡住，钥匙拧不动。她的呼吸一下子乱了，背贴着墙，手指发白，嘴里反复说「打不开……打不开」。你把锁拨开后，她没有立刻松开衣角，只是盯着门缝，过了很久才小声说：「……对不起，我知道这只是门锁。」",
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 88,
+    "enabled": true
+  },
+  {
+    "key": "crisis_wrong_number",
+    "name": "打错的电话",
+    "category": "random",
+    "trigger": {
+      "all": [
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 30
+        },
+        {
+          "type": "attr",
+          "key": "vigilance",
+          "op": ">=",
+          "value": 18
+        },
+        {
+          "type": "period",
+          "in": [
+            "afternoon",
+            "evening",
+            "night"
+          ]
+        }
+      ],
+      "chance": 0.1
+    },
+    "cost": {},
+    "effects": {
+      "attrs": {
+        "mood": -5,
+        "vigilance": 4,
+        "dependence": 2,
+        "trust": 1
+      }
+    },
+    "prompt_template": "陌生号码打来，对方语气不善地喊了另一个名字。她听了两秒就把手机塞给你，整个人退半步，声音发颤：「不是找我的……对吗？」确认是打错之后，她仍把手机调成静音，很久才敢重新拿回手里。",
+    "once": false,
+    "cooldown_minutes": 10080,
+    "priority": 70,
+    "enabled": true
+  },
+  {
+    "key": "crisis_mild_fever",
+    "name": "低烧的午后",
+    "category": "fixed",
+    "trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "story_promise_done",
+          "value": true
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 42
+        },
+        {
+          "type": "period",
+          "in": [
+            "afternoon",
+            "evening"
+          ]
+        },
+        {
+          "type": "game_day",
+          "op": ">=",
+          "value": 8
+        }
+      ]
+    },
+    "cost": {},
+    "effects": {
+      "attrs": {
+        "mood": -6,
+        "dependence": 3,
+        "affection": 2,
+        "trust": 2
+      },
+      "flags": {
+        "crisis_mild_fever_done": true
+      }
+    },
+    "prompt_template": "她额头有一点热，却坚持说「我可以自己躺一会儿」。你递过温水和退烧贴时，她犹豫着接住，低声补了一句：「……如果麻烦的话，你去忙你的就好。」语气里没有拒绝，只是还不太敢把照顾当成理所当然。",
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 86,
+    "enabled": true
+  },
+  {
+    "key": "crisis_money_anxiety",
+    "name": "看到账单的瞬间",
+    "category": "random",
+    "trigger": {
+      "all": [
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 35
+        },
+        {
+          "type": "attr",
+          "key": "dependence",
+          "op": ">=",
+          "value": 20
+        },
+        {
+          "type": "period",
+          "in": [
+            "evening",
+            "night"
+          ]
+        }
+      ],
+      "chance": 0.12
+    },
+    "cost": {},
+    "effects": {
+      "attrs": {
+        "mood": -4,
+        "vigilance": 3,
+        "trust": 2,
+        "affection": 1
+      }
+    },
+    "prompt_template": "水电账单放在桌上。她看了一眼数字，脸色白了白，立刻去翻自己那点零钱，像要补上什么：「这些……是不是因为我住在这里才多出来的？我可以少用水。」你解释清楚后，她才慢慢把钱收回去，耳尖却一直红着。",
+    "once": false,
+    "cooldown_minutes": 10080,
+    "priority": 68,
     "enabled": true
   }
 ]

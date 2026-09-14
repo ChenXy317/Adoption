@@ -3,18 +3,44 @@
     "key": "date_first_outing",
     "name": "第一次一起出门",
     "category": "story",
-    "enter_trigger": {"all": [
-      {"type": "attr", "key": "trust", "op": ">=", "value": 18},
-      {"type": "attr", "key": "affection", "op": ">=", "value": 12},
-      {"type": "period", "in": ["morning", "noon", "afternoon"]}
-    ]},
+    "enter_trigger": {
+      "all": [
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 18
+        },
+        {
+          "type": "attr",
+          "key": "affection",
+          "op": ">=",
+          "value": 12
+        },
+        {
+          "type": "period",
+          "in": [
+            "morning",
+            "noon",
+            "afternoon"
+          ]
+        }
+      ]
+    },
     "enter_cost": {},
     "scene_prompt": "一个好天气的白天，你带她一起出门。她换上了你买给她的浅色连衣裙，出门前反复检查有没有弄脏衣角；一路上跟在你半步之后，紧张地留意着周围的人和声音，只在你说起话来时才敢放松一点。",
     "goal": "带她第一次一起出门：让她在外面慢慢放松下来，愿意和你说说看到的东西。",
     "min_turns": 4,
     "max_turns": 12,
     "exit": {},
-    "effects": {"attrs": {"mood": 6, "affection": 3, "intimacy": 2, "trust": 1}},
+    "effects": {
+      "attrs": {
+        "mood": 6,
+        "affection": 3,
+        "intimacy": 2,
+        "trust": 1
+      }
+    },
     "next_scenes": [],
     "once": false,
     "cooldown_minutes": 10080,
@@ -25,19 +51,49 @@
     "key": "talk_rainy_night",
     "name": "雨夜谈心",
     "category": "story",
-    "enter_trigger": {"all": [
-      {"type": "attr", "key": "trust", "op": ">=", "value": 35},
-      {"type": "attr", "key": "affection", "op": ">=", "value": 30},
-      {"type": "period", "in": ["evening", "night"]}
-    ]},
+    "enter_trigger": {
+      "all": [
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 35
+        },
+        {
+          "type": "attr",
+          "key": "affection",
+          "op": ">=",
+          "value": 30
+        },
+        {
+          "type": "period",
+          "in": [
+            "evening",
+            "night"
+          ]
+        }
+      ]
+    },
     "enter_cost": {},
     "scene_prompt": "夜里又下起了雨，雨声和你们相遇那晚一模一样。她抱着毯子坐在窗边没有去睡，看了很久的雨，几次张口又停下。房间里的灯很暗，很适合说一些平时说不出口的话。",
     "goal": "让她试着说出一点关于过去的事和那时候的心情；不逼她，接住她说的每一句。",
     "min_turns": 4,
     "max_turns": 12,
     "exit": {},
-    "effects": {"attrs": {"trust": 6, "affection": 4, "intimacy": 3, "mood": 4}, "flags": {"talk_rainy_night_done": true}},
-    "next_scenes": ["care_fever"],
+    "effects": {
+      "attrs": {
+        "trust": 6,
+        "affection": 4,
+        "intimacy": 3,
+        "mood": 4
+      },
+      "flags": {
+        "talk_rainy_night_done": true
+      }
+    },
+    "next_scenes": [
+      "care_fever"
+    ],
     "once": true,
     "cooldown_minutes": 0,
     "priority": 60,
@@ -47,21 +103,219 @@
     "key": "care_fever",
     "name": "照顾发烧的她",
     "category": "relationship",
-    "enter_trigger": {"all": [
-      {"type": "flag", "key": "scene_unlocked:care_fever"},
-      {"type": "attr", "key": "trust", "op": ">=", "value": 35}
-    ]},
+    "enter_trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "scene_unlocked:care_fever"
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 35
+        }
+      ]
+    },
     "enter_cost": {},
     "scene_prompt": "那天晚上她在雨里站得久了些，半夜发起烧来。她烧得迷迷糊糊，脸颊发红，却还攥着被角小声说「我没事，不用管我」，说什么都不肯麻烦你。",
     "goal": "照顾发烧的她：量体温、喂药、守着她，让她安心地把自己交给你照顾。",
     "min_turns": 4,
     "max_turns": 14,
     "exit": {},
-    "effects": {"attrs": {"trust": 5, "dependence": 4, "affection": 4, "mood": 3}},
+    "effects": {
+      "attrs": {
+        "trust": 5,
+        "dependence": 4,
+        "affection": 4,
+        "mood": 3
+      }
+    },
     "next_scenes": [],
     "once": true,
     "cooldown_minutes": 0,
     "priority": 65,
+    "enabled": true
+  },
+  {
+    "key": "shop_supermarket",
+    "name": "第一次一起逛超市",
+    "category": "relationship",
+    "enter_trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "scene_unlocked:shop_supermarket"
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 16
+        }
+      ]
+    },
+    "enter_cost": {},
+    "scene_prompt": "超市灯光明亮，货架上标价清晰。她推着购物车跟在你身后半步，每拿一样生活用品都先征求你的意见，像在学习「两个人一起生活」该怎么买东西。路过零食区时她停了一下，又很快走开，假装自己并不想要。",
+    "goal": "第一次一起逛超市：让她敢提出一点自己的偏好，并感到被允许占用共同的生活空间。",
+    "min_turns": 4,
+    "max_turns": 12,
+    "exit": {},
+    "effects": {
+      "attrs": {
+        "mood": 5,
+        "affection": 3,
+        "trust": 2,
+        "intimacy": 1
+      },
+      "flags": {
+        "shop_supermarket_done": true
+      }
+    },
+    "next_scenes": [],
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 40,
+    "enabled": true
+  },
+  {
+    "key": "date_night_market",
+    "name": "夜市走走",
+    "category": "story",
+    "enter_trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "scene_unlocked:date_night_market"
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 26
+        },
+        {
+          "type": "period",
+          "in": [
+            "evening",
+            "night"
+          ]
+        }
+      ]
+    },
+    "enter_cost": {},
+    "scene_prompt": "夜市灯笼和油烟味混在一起，人声很近。她下意识贴着你的袖口走，偶有摊主大声招揽时会轻轻一颤，但闻到糖炒栗子的香气又会忍不住放慢脚步。这不是惊吓，更像一种小心翼翼的新鲜。",
+    "goal": "夜市约会：让她在嘈杂里仍感到安全，愿意试吃一样小吃，并留下一点轻松的共同记忆。",
+    "min_turns": 4,
+    "max_turns": 12,
+    "exit": {},
+    "effects": {
+      "attrs": {
+        "mood": 6,
+        "affection": 4,
+        "trust": 2,
+        "intimacy": 2
+      },
+      "flags": {
+        "date_night_market_done": true
+      }
+    },
+    "next_scenes": [],
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 45,
+    "enabled": true
+  },
+  {
+    "key": "quiet_study_afternoon",
+    "name": "安静的午后共读",
+    "category": "relationship",
+    "enter_trigger": {
+      "all": [
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 32
+        },
+        {
+          "type": "attr",
+          "key": "affection",
+          "op": ">=",
+          "value": 28
+        },
+        {
+          "type": "period",
+          "in": [
+            "afternoon",
+            "noon"
+          ]
+        }
+      ]
+    },
+    "enter_cost": {},
+    "scene_prompt": "午后阳光斜斜照进客厅。你在看书或处理一点事情，她坐在不远不近的位置，手里也捧着那本旧绘本或练习簿。偶尔翻页声很轻，像生怕打扰你；你抬头时，她会迅速把视线落回纸上，耳尖却悄悄红了。",
+    "goal": "安静共读的下午：不强迫交谈，让她习惯与你共享同一空间的沉默，并感到被接纳。",
+    "min_turns": 3,
+    "max_turns": 10,
+    "exit": {},
+    "effects": {
+      "attrs": {
+        "trust": 3,
+        "affection": 2,
+        "intimacy": 2,
+        "mood": 4
+      },
+      "flags": {
+        "quiet_study_afternoon_done": true
+      }
+    },
+    "next_scenes": [],
+    "once": false,
+    "cooldown_minutes": 10080,
+    "priority": 35,
+    "enabled": true
+  },
+  {
+    "key": "care_panic_comfort",
+    "name": "恐慌之后的安抚",
+    "category": "relationship",
+    "enter_trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "scene_unlocked:care_panic_comfort"
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 40
+        }
+      ]
+    },
+    "enter_cost": {},
+    "scene_prompt": "门锁事件过去不久。她还坐在玄关附近，呼吸已经平稳些，却仍不敢离门太远。她反复道歉，说自己反应过激，又怕你因此觉得她麻烦。房间里很安静，适合用缓慢、清楚的话把安全感一点一点还回去。",
+    "goal": "危机后的安抚：确认当下安全，不追问旧伤细节，让她重新把信任放回你这里，而不是沉进羞耻。",
+    "min_turns": 4,
+    "max_turns": 12,
+    "exit": {},
+    "effects": {
+      "attrs": {
+        "trust": 5,
+        "dependence": 2,
+        "affection": 3,
+        "vigilance": -6,
+        "mood": 4
+      },
+      "flags": {
+        "care_panic_comfort_done": true
+      }
+    },
+    "next_scenes": [],
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 70,
     "enabled": true
   }
 ]
