@@ -11,7 +11,7 @@ import json
 import logging
 import threading
 
-from fastapi import APIRouter
+from fastapi import APIRouter, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from starlette.concurrency import run_in_threadpool
@@ -19,7 +19,7 @@ from starlette.concurrency import run_in_threadpool
 from ai_client import AIClientError, ai
 from config import CHAT_HISTORY_MESSAGES, EVENT_RECENT_WINDOW_MINUTES
 from db import SessionLocal
-from game import clock, events, scenes
+from game import clock, events, memory, scenes
 from game.attributes import apply_deltas, phase_of
 from game.prompt import build_messages
 from game.tags import StateTagStripper, parse_state
@@ -92,6 +92,10 @@ def _prepare(save_id: int, message: str) -> dict:
             session, save, window_minutes=EVENT_RECENT_WINDOW_MINUTES, limit=3
         )
         active_scene = scenes.get_active(session, save_id)
+        memories = memory.retrieve(session, save_id)
+        if memories:
+            memory.mark_recalled(session, [m["id"] for m in memories])
+            session.commit()
         messages = build_messages(
             save,
             character,
@@ -101,6 +105,7 @@ def _prepare(save_id: int, message: str) -> dict:
             settings,
             active_events,
             active_scene,
+            memories,
         )
         return {
             "messages": messages,
@@ -194,6 +199,7 @@ def _settle(save_id: int, text: str, tag_raw: str, interrupted: bool) -> dict:
             if assistant is not None:
                 assistant.game_minutes_at = settled["absolute_minutes"]
             session.commit()
+            memory_due = memory.trigger_if_due(session, save_id)
 
             abs_minutes = clock.absolute_minutes(save.game_minutes, settings)
             virtual = {
@@ -232,6 +238,7 @@ def _settle(save_id: int, text: str, tag_raw: str, interrupted: bool) -> dict:
                     "ended": scenes.brief(scene_info.get("ended")),
                     "active": scene_info.get("active"),
                 },
+                "memory_due": memory_due,
                 "messages": settled["messages"],
             }
     finally:
@@ -251,7 +258,7 @@ def _settle_in_thread(save_id: int, text: str, tag_raw: str) -> None:
 
 
 @router.post("/api/saves/{save_id}/chat")
-async def chat(save_id: int, req: ChatIn):
+async def chat(save_id: int, req: ChatIn, background: BackgroundTasks):
     message = req.message.strip()
     prepared = await run_in_threadpool(_prepare, save_id, message)
 
@@ -340,6 +347,8 @@ async def chat(save_id: int, req: ChatIn):
                 "virtual": settled["virtual"],
             },
         )
+        if settled.get("memory_due"):
+            background.add_task(memory.safe_run_summary, save_id)
         if error_payload is not None:
             yield sse("error", error_payload)
         else:
@@ -356,4 +365,9 @@ async def chat(save_id: int, req: ChatIn):
                 },
             )
 
-    return StreamingResponse(event_gen(), media_type="text/event-stream", headers=SSE_HEADERS)
+    return StreamingResponse(
+        event_gen(),
+        media_type="text/event-stream",
+        headers=SSE_HEADERS,
+        background=background,
+    )

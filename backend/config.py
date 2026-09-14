@@ -82,12 +82,16 @@ NEGLECT_DAYS = 3                   # 两次互动间推进 ≥N 游戏日且无�
 NEGLECT_AFFECTION_PER_DAY = 1      # 冷落每多 1 游戏日的好感降幅
 NEGLECT_AFFECTION_MAX = 5          # 单次冷落的好感降幅上限
 
-# ── 对话与记忆（M4 起逐步启用）──
+# ── 对话与记忆（详见 PLAN 5.6）──
 CHAT_HISTORY_MESSAGES = 30      # 组装 prompt 的最近消息条数
 MEMORY_TRIGGER_TURNS = 20       # 未总结消息达到该数量触发总结
-MEMORY_IDLE_MINUTES = 30        # 空闲调度（技术性，非虚拟时间）
-MEMORY_CHAR_BUDGET = 2000       # 永久记忆注入字符预算
+MEMORY_IDLE_MINUTES = 30        # 空闲调度（技术性，非虚拟时间；暂未启用）
+MEMORY_CHAR_BUDGET = 2000       # 永久记忆注入 prompt 的字符预算
 MEMORY_MODEL = ""               # 总结模型 key；空则用主对话模型
+MEMORY_MAX_MESSAGES_PER_JOB = 200   # 单次总结最多处理的消息条数
+MEMORY_SUMMARY_MAX_TOKENS = 2048    # 总结请求的输出上限
+MEMORY_PROMPT_CHAR_BUDGET = 12000   # 总结请求中对话/事件原文的字符预算
+MEMORY_EXISTING_LIMIT = 60          # 总结时附上的已有记忆条数
 
 # 各 prompt 块字符预算
 PROMPT_ATTR_CHAR_BUDGET = 600

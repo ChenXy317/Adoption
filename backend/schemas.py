@@ -62,6 +62,21 @@ class SceneEndIn(BaseModel):
     abort: bool = False
 
 
+class MemoryIn(BaseModel):
+    """手动新增记忆。"""
+
+    kind: str = Field(default="fact", max_length=16)
+    content: str = Field(min_length=1, max_length=2000)
+    importance: int = Field(default=5, ge=1, le=10)
+
+
+class MemoryPatch(BaseModel):
+    kind: str | None = Field(default=None, max_length=16)
+    content: str | None = Field(default=None, min_length=1, max_length=2000)
+    importance: int | None = Field(default=None, ge=1, le=10)
+    status: str | None = Field(default=None, max_length=16)
+
+
 class AttributeDefIn(BaseModel):
     key: str = Field(min_length=1, max_length=64, pattern=r"^[a-z][a-z0-9_]{0,63}$")
     name: str = Field(min_length=1, max_length=64)

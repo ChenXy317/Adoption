@@ -284,6 +284,65 @@ class AIClient:
             "request_failed",
         )
 
+    async def complete(
+        self,
+        messages: list[dict],
+        model_id: str,
+        base_url: str,
+        api_key: str,
+        max_tokens: int | None = None,
+        params: dict | None = None,
+    ) -> str:
+        """非流式补全（供记忆总结等后台任务使用），返回剥离思考链后的文本。"""
+        client = self._get_client(base_url, api_key)
+        base_kwargs = self._build_kwargs(messages, model_id, max_tokens, params, stream=False)
+        use_extra = base_url not in self._thinking_extra_rejected
+        last_exception = None
+        for attempt in range(_API_RETRY_MAX + 1):
+            try:
+                kwargs = (
+                    self._with_thinking_off(base_kwargs, base_url)
+                    if use_extra
+                    else base_kwargs
+                )
+                resp = await client.chat.completions.create(**kwargs)
+                raw = resp.choices[0].message.content if resp.choices else ""
+                stripper = _ThinkStripper()
+                return (stripper.feed(raw or "") + stripper.flush()).strip()
+            except APIStatusError as e:
+                if use_extra and e.status_code == 400 and self._looks_like_unknown_param(e):
+                    self._reject_thinking_extra(base_url)
+                    use_extra = False
+                    continue
+                if e.status_code == 401:
+                    raise AIClientError("API 认证失败，请检查该供应商的密钥", "auth_failed") from e
+                if e.status_code == 404:
+                    raise AIClientError("接口或模型不存在，请检查基础 URL 与 model-id", "not_found") from e
+                if e.status_code == 429:
+                    last_exception = e
+                    if attempt < _API_RETRY_MAX:
+                        await asyncio.sleep(_API_RETRY_DELAY * (2 ** attempt))
+                        continue
+                    raise AIClientError("API 请求频率过高，请稍后重试", "rate_limited") from e
+                if e.status_code is not None and e.status_code >= 500:
+                    last_exception = e
+                    if attempt < _API_RETRY_MAX:
+                        await asyncio.sleep(_API_RETRY_DELAY * (2 ** attempt))
+                        continue
+                    raise AIClientError(f"API 服务暂时不可用 ({e.status_code})", "service_unavailable") from e
+                raise AIClientError(f"API 请求被拒绝 ({e.status_code})", "request_failed") from e
+            except (RateLimitError, APITimeoutError, APIConnectionError, APIError,
+                    httpx.TimeoutException, httpx.NetworkError) as e:
+                last_exception = e
+                if attempt < _API_RETRY_MAX:
+                    await asyncio.sleep(_API_RETRY_DELAY * (2 ** attempt))
+                    continue
+                raise AIClientError(f"总结请求失败: {e}", "request_failed") from e
+        raise AIClientError(
+            f"总结请求失败 (已重试 {_API_RETRY_MAX} 次): {last_exception}",
+            "request_failed",
+        )
+
     async def test_hello(self, model_id: str, base_url: str, api_key: str) -> dict:
         """向模型发一条 hello，仅供用户参考连通性。"""
         client = AsyncOpenAI(api_key=api_key, base_url=base_url, timeout=20)

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from config import (
     CHAT_HISTORY_MESSAGES,
+    MEMORY_CHAR_BUDGET,
     PROMPT_ATTR_CHAR_BUDGET,
     PROMPT_EVENT_CHAR_BUDGET,
 )
@@ -139,6 +140,36 @@ def _event_block(events: list[dict]) -> str:
     )
 
 
+_MEMORY_KIND_LABELS = {
+    "fact": "事实",
+    "event": "事件",
+    "relationship": "关系",
+    "promise": "约定",
+}
+
+
+def _memory_block(memories: list[dict]) -> str:
+    lines: list[str] = []
+    used = 0
+    for item in memories:
+        content = str(item.get("content") or "").strip()
+        if not content:
+            continue
+        label = _MEMORY_KIND_LABELS.get(str(item.get("kind") or ""), "记忆")
+        line = f"- [{label}] {content}"
+        if used + len(line) > MEMORY_CHAR_BUDGET:
+            break
+        lines.append(line)
+        used += len(line)
+    if not lines:
+        return ""
+    return (
+        "# 长期记忆\n"
+        "以下是你与玩家之间已经发生、需要记住的事；自然地体现在言行里，不要逐条复述：\n"
+        + "\n".join(lines)
+    )
+
+
 def build_messages(
     save: Save,
     character: Character,
@@ -148,6 +179,7 @@ def build_messages(
     settings: dict,
     active_events: list[dict] | None = None,
     active_scene: dict | None = None,
+    memories: list[dict] | None = None,
 ) -> list[dict]:
     """组装 OpenAI 兼容消息列表（单条 system + 最近消息）。"""
     abs_minutes = clock.absolute_minutes(save.game_minutes, settings)
@@ -176,6 +208,9 @@ def build_messages(
     event_block = _event_block(active_events or [])
     if event_block:
         system_parts.append(event_block)
+    memory_block = _memory_block(memories or [])
+    if memory_block:
+        system_parts.append(memory_block)
     content_prompt = (settings or {}).get("content_prompt") or ""
     if content_prompt.strip():
         system_parts.append("# 内容风格（用户自定义）\n" + content_prompt.strip())

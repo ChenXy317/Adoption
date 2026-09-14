@@ -5,6 +5,7 @@ FastAPI 服务入口 — 网页版 AI 养成游戏。
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import sys
@@ -18,12 +19,14 @@ from fastapi.staticfiles import StaticFiles
 from ai_client import ai
 from config import ALLOWED_ORIGINS, APP_HOST, APP_PORT, BASE_DIR, FRONTEND_DIR
 from db import SessionLocal, init_db
+from game import memory
 from routes.advance import router as advance_router
 from routes.catalog import router as catalog_router
 from routes.character import router as character_router
 from routes.chat import router as chat_router
 from routes.defs import router as defs_router
 from routes.events import router as events_router
+from routes.memories import router as memories_router
 from routes.saves import router as saves_router
 from routes.scenes import router as scenes_router
 from routes.state import router as state_router
@@ -62,8 +65,12 @@ async def lifespan(app: FastAPI):
         apply_character_seed(session)
         apply_event_seeds(session)
         apply_scene_seeds(session)
+        pending_saves = memory.requeue_interrupted(session)
     finally:
         session.close()
+    for save_id in pending_saves:
+        asyncio.create_task(memory.safe_run_summary(save_id))
+        logger.info("补跑中断的记忆总结任务: save=%s", save_id)
     logger.info("服务初始化完成")
     yield
     await ai.close()
@@ -89,6 +96,7 @@ app.include_router(catalog_router)
 app.include_router(advance_router)
 app.include_router(events_router)
 app.include_router(scenes_router)
+app.include_router(memories_router)
 
 
 @app.exception_handler(HTTPException)

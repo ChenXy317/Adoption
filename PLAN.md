@@ -5,7 +5,7 @@
 > 时间与现实完全隔离：纯虚拟时钟，由对话/行动推进；经济系统（金钱/打工/消费）作为互动燃料。
 > **定位：单女主、深刻画的 galgame 式体验（方向参考 Teaching Feeling）。女主角全局唯一（跨存档共享设定书）；存档 = 从头来过的周目。核心日常循环：照顾/陪伴互动 → 状态与关系渐变（警戒降、信任升）→ 时间推进 → 阶段解锁新互动与特殊事件。优先角色刻画深度，分支/日程等玩法后置。**
 
-- 状态：M1 骨架、M2 女主角刻画、M3 事件与时间、M3.5 多轮场景已完成；M4 记忆系统待启动
+- 状态：M1 骨架、M2 女主角刻画、M3 事件与时间、M3.5 多轮场景、M4 记忆系统已完成；M5 行动与经济待启动
 - 项目目录：`D:\Projects\New Idea`（代码直接建于此目录；本文档为唯一真相源）
 - 本文档随决策更新
 
@@ -174,6 +174,8 @@ FastAPI
 
 - kind：`fact` / `event` / `relationship` / `promise`；importance 1–10
 - 异步执行（BackgroundTasks），失败记 `memory_jobs` 下次重试，不阻塞对话；执行前用条件更新抢占 `running` 状态（save 级互斥），防止两次对话并发触发重复总结
+- 自动触发在对话流后结算完成时登记任务（约当响应结束执行）；手动总结同步等待结果；启动时中断的 running 任务回退 pending 补跑；总结模型取 `MEMORY_MODEL`，空则用存档主对话模型
+- 检索按「重要性 × 新近度」打分，核心记忆（`relationship` 或 importance ≥ 8）常驻预算；注入同时更新 `last_recalled_at` / `recall_count`
 
 **检索（三级递进）**：
 
@@ -183,7 +185,7 @@ FastAPI
 
 **核心记忆**：`kind=relationship` 或 `importance ≥ 8` 永远注入。
 
-**配置项**：`MEMORY_WINDOW_MESSAGES` / `MEMORY_TRIGGER_TURNS` / `MEMORY_IDLE_MINUTES` / `MEMORY_CHAR_BUDGET` / `MEMORY_MODEL`（总结可单独用便宜模型）；prompt 各块（属性/事件/记忆）分别设字符预算。
+**配置项**：`MEMORY_TRIGGER_TURNS` / `MEMORY_CHAR_BUDGET` / `MEMORY_MODEL`（总结可单独用便宜模型）/ `MEMORY_MAX_MESSAGES_PER_JOB` / `MEMORY_SUMMARY_MAX_TOKENS` / `MEMORY_PROMPT_CHAR_BUDGET`；即时记忆窗口取 `CHAT_HISTORY_MESSAGES`，`MEMORY_IDLE_MINUTES` 保留未启用；prompt 各块（属性/事件/记忆）分别设字符预算。
 
 ### 5.7 性格演化
 

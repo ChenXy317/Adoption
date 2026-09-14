@@ -7,6 +7,7 @@
       </div>
       <div class="row">
         <span class="time">{{ game.current?.virtual?.label || "" }}</span>
+        <button class="btn" @click="memoryOpen = true">记忆</button>
         <button class="btn" @click="catalogOpen = true">模型配置</button>
       </div>
     </header>
@@ -52,6 +53,7 @@
     </div>
 
     <ModelCatalogModal v-if="catalogOpen" @close="onCatalogClose" />
+    <MemoryPanel v-if="memoryOpen" :save-id="$route.params.id" @close="memoryOpen = false" />
   </div>
 </template>
 
@@ -64,6 +66,7 @@ import AdvancePanel from "../components/AdvancePanel.vue";
 import ChatInput from "../components/ChatInput.vue";
 import ChatStream from "../components/ChatStream.vue";
 import EventPanel from "../components/EventPanel.vue";
+import MemoryPanel from "../components/MemoryPanel.vue";
 import ModelCatalogModal from "../components/ModelCatalogModal.vue";
 import SceneBanner from "../components/SceneBanner.vue";
 import StatusBars from "../components/StatusBars.vue";
@@ -80,6 +83,7 @@ const game = useGameStore();
 const chat = useChatStore();
 const ui = useUiStore();
 const catalogOpen = ref(false);
+const memoryOpen = ref(false);
 
 const characterLine = computed(() => {
   const c = game.current?.character;
