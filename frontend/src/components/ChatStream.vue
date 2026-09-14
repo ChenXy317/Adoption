@@ -65,18 +65,22 @@ async function loadEarlier() {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 18px;
+  gap: 14px;
+  padding: 20px 22px;
+  background: transparent;
 }
 
 .empty {
   text-align: center;
-  margin-top: 40px;
+  margin-top: 48px;
+  font-size: 13px;
+  letter-spacing: 0.04em;
 }
 
 .load-earlier {
   display: flex;
   justify-content: center;
+  margin-bottom: 4px;
 }
 
 .small {

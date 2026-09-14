@@ -1,12 +1,14 @@
 <template>
   <div class="game">
     <header class="topbar">
-      <div class="row">
-        <button class="btn" @click="router.push('/')">← 返回</button>
-        <strong>{{ game.current?.save?.name || "…" }}</strong>
+      <div class="topbar-left">
+        <button class="btn ghost-back" @click="router.push('/')">← 返回</button>
+        <div class="save-info">
+          <strong class="save-title">{{ game.current?.save?.name || "…" }}</strong>
+          <span class="time">{{ game.current?.virtual?.label || "" }}</span>
+        </div>
       </div>
-      <div class="row">
-        <span class="time">{{ game.current?.virtual?.label || "" }}</span>
+      <div class="topbar-right">
         <button class="btn" @click="memoryOpen = true">记忆</button>
         <button class="btn" @click="defsOpen = true">定义</button>
         <button class="btn" @click="themeOpen = true">主题</button>
@@ -23,12 +25,12 @@
       <aside class="side">
         <section class="card panel">
           <h3>状态</h3>
-          <div class="dim small" v-if="characterLine">{{ characterLine }}</div>
+          <div class="dim meta" v-if="characterLine">{{ characterLine }}</div>
           <div class="phase" v-if="game.current?.phase">
             关系阶段：{{ game.current.phase }}
             <template v-if="game.current?.tendency"> · {{ game.current.tendency }}</template>
           </div>
-          <div class="phase" v-if="game.current?.mood_label">
+          <div class="mood" v-if="game.current?.mood_label">
             此刻心情：{{ game.current.mood_label }}
           </div>
           <StatusBars :attributes="game.current?.attributes || []" />
@@ -151,20 +153,59 @@ async function onCatalogClose() {
   height: 100%;
   display: flex;
   flex-direction: column;
+  background: var(--bg);
 }
 
 .topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 20px;
+  gap: 16px;
+  padding: 10px 20px;
   border-bottom: 1px solid var(--border);
   background: var(--bg-soft);
+  flex-shrink: 0;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.ghost-back {
+  flex-shrink: 0;
+}
+
+.save-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.save-title {
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .time {
   color: var(--accent);
-  font-size: 13px;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .body {
@@ -173,7 +214,7 @@ async function onCatalogClose() {
   gap: 16px;
   padding: 16px 20px;
   min-height: 0;
-  max-width: 1280px;
+  max-width: 1320px;
   width: 100%;
   margin: 0 auto;
 }
@@ -184,18 +225,21 @@ async function onCatalogClose() {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
 }
 
 .side {
-  width: 280px;
+  width: 292px;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   overflow-y: auto;
+  padding-bottom: 8px;
 }
 
 .panel {
-  padding: 14px;
+  padding: 12px 14px;
 }
 
 .panel h3 {
@@ -203,22 +247,27 @@ async function onCatalogClose() {
   font-size: 13px;
   color: var(--text-dim);
   font-weight: 600;
+  letter-spacing: 0.04em;
 }
 
-.money {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--warn);
+.meta {
+  font-size: 12px;
   margin-bottom: 6px;
 }
 
-.phase {
+.phase,
+.mood {
   color: var(--accent);
   font-size: 12px;
-  margin: 4px 0 10px;
+  margin: 2px 0;
+  line-height: 1.45;
 }
 
-.small {
-  font-size: 12px;
+.mood {
+  margin-bottom: 10px;
+}
+
+.phase:last-of-type {
+  margin-bottom: 10px;
 }
 </style>

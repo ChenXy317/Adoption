@@ -68,8 +68,24 @@ async function run(item) {
 </script>
 
 <style scoped>
+.panel {
+  padding: 12px 14px;
+}
+
+.panel h3 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--text-dim);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
 .action {
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+}
+
+.action:last-child {
+  margin-bottom: 0;
 }
 
 .action-head {
@@ -77,7 +93,7 @@ async function run(item) {
   justify-content: space-between;
   gap: 8px;
   font-size: 12px;
-  margin-bottom: 4px;
+  margin-bottom: 5px;
 }
 
 .small {

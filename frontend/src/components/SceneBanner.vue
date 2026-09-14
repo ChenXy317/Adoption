@@ -46,11 +46,24 @@ async function endScene() {
 </script>
 
 <style scoped>
+.panel {
+  padding: 12px 14px;
+}
+
+.panel h3 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--text-dim);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
 .scene-head {
   display: flex;
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 6px;
+  align-items: baseline;
 }
 
 .scene-name {
@@ -61,7 +74,7 @@ async function endScene() {
 
 .goal {
   line-height: 1.5;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .end {

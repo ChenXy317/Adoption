@@ -24,24 +24,28 @@ const changeText = computed(() => {
 
 <style scoped>
 .bubble {
-  max-width: 86%;
-  padding: 10px 14px;
-  border-radius: 12px;
+  max-width: 82%;
+  padding: 12px 16px;
+  border-radius: 14px;
   position: relative;
   white-space: pre-wrap;
   word-break: break-word;
+  line-height: 1.65;
+  font-size: 14px;
 }
 
 .bubble.user {
   align-self: flex-end;
   background: var(--accent-soft);
-  border: 1px solid rgba(124, 140, 255, 0.35);
+  border: 1px solid var(--accent-border);
+  border-bottom-right-radius: 6px;
 }
 
 .bubble.assistant {
   align-self: flex-start;
-  background: var(--panel);
+  background: var(--panel-2);
   border: 1px solid var(--border);
+  border-bottom-left-radius: 6px;
 }
 
 .bubble.system,
@@ -51,13 +55,17 @@ const changeText = computed(() => {
   border: 1px dashed var(--border);
   color: var(--text-dim);
   font-size: 12px;
-  max-width: 92%;
+  max-width: 90%;
+  padding: 8px 14px;
+  border-radius: 10px;
+  text-align: center;
 }
 
 .cursor {
   display: inline-block;
   animation: blink 1s infinite;
   color: var(--accent);
+  margin-left: 1px;
 }
 
 @keyframes blink {
@@ -67,8 +75,11 @@ const changeText = computed(() => {
 }
 
 .changes {
-  margin-top: 6px;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border-soft);
   font-size: 11px;
   color: var(--warn);
+  letter-spacing: 0.02em;
 }
 </style>

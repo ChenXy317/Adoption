@@ -86,15 +86,29 @@ async function run(item) {
 </script>
 
 <style scoped>
+.panel {
+  padding: 12px 14px;
+}
+
+.panel h3 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--text-dim);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
 .money {
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 700;
   color: var(--warn);
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
 }
 
 .work {
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .work-head {
@@ -102,7 +116,7 @@ async function run(item) {
   justify-content: space-between;
   gap: 8px;
   font-size: 12px;
-  margin-bottom: 4px;
+  margin-bottom: 5px;
 }
 
 .work .btn {
@@ -111,6 +125,9 @@ async function run(item) {
 
 .flows-head {
   margin: 12px 0 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-soft);
+  letter-spacing: 0.03em;
 }
 
 .flow {
@@ -119,14 +136,23 @@ async function run(item) {
   gap: 6px;
   align-items: baseline;
   font-size: 12px;
-  padding: 3px 0;
-  border-bottom: 1px dashed var(--border);
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.flow:last-child {
+  border-bottom: none;
 }
 
 .flow-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.flow-amount {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
 }
 
 .flow-amount.in {

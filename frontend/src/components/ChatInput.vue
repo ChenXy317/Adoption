@@ -46,18 +46,26 @@ function onEnter(event) {
 <style scoped>
 .input-area {
   display: flex;
-  gap: 10px;
-  padding: 12px 16px 16px;
+  gap: 12px;
+  padding: 14px 18px 16px;
   border-top: 1px solid var(--border);
+  background: var(--bg-soft);
+  border-radius: 0 0 var(--radius) var(--radius);
 }
 
 textarea {
   flex: 1;
   resize: none;
+  min-height: 72px;
+  padding: 10px 12px;
+  line-height: 1.55;
+  border-radius: var(--radius-xs);
 }
 
 .input-area .btn {
   align-self: flex-end;
+  min-width: 72px;
   height: 40px;
+  padding: 0 18px;
 }
 </style>

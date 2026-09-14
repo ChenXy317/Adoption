@@ -4,7 +4,7 @@
     <div v-if="!events.length" class="dim small">还没有发生过事件。</div>
     <div v-for="event in events" :key="event.id" class="event">
       <div class="event-head">
-        <span>{{ event.name }}</span>
+        <span class="event-name">{{ event.name }}</span>
         <span class="dim small">{{ event.virtual_label }}</span>
       </div>
       <div class="dim small content">{{ event.content }}</div>
@@ -19,8 +19,28 @@ defineProps({
 </script>
 
 <style scoped>
+.panel {
+  padding: 12px 14px;
+}
+
+.panel h3 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--text-dim);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
 .event {
   margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.event:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
 }
 
 .event-head {
@@ -29,6 +49,10 @@ defineProps({
   gap: 8px;
   font-size: 12px;
   margin-bottom: 3px;
+}
+
+.event-name {
+  font-weight: 500;
 }
 
 .small {

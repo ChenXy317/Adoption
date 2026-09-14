@@ -30,14 +30,21 @@ const ui = useUiStore();
 }
 
 .toast {
-  background: var(--panel-2);
+  background: var(--panel);
   border: 1px solid var(--border);
   border-left: 3px solid var(--accent);
-  border-radius: 8px;
-  padding: 10px 14px;
+  border-radius: 10px;
+  padding: 11px 16px;
   max-width: 360px;
   cursor: pointer;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--shadow-modal);
+  font-size: 13px;
+  line-height: 1.45;
+  transition: opacity 0.15s ease;
+}
+
+.toast:hover {
+  opacity: 0.88;
 }
 
 .toast.error {

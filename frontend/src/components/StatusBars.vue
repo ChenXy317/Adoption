@@ -48,24 +48,30 @@ function round(v) {
   display: flex;
   justify-content: space-between;
   font-size: 12px;
-  margin-bottom: 3px;
+  margin-bottom: 4px;
+  letter-spacing: 0.01em;
 }
 
 .bar {
-  height: 6px;
+  height: 5px;
   background: var(--bg-soft);
   border-radius: 3px;
   overflow: hidden;
+  border: 1px solid var(--border-soft);
 }
 
 .bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent), #9aa6ff);
+  background: linear-gradient(90deg, var(--accent), #d4a8b8);
   border-radius: 3px;
-  transition: width 0.4s;
+  transition: width 0.35s ease;
 }
 
 .bar-fill.low {
-  background: linear-gradient(90deg, var(--danger), #ff9aa8);
+  background: linear-gradient(90deg, var(--danger), #d4a0a0);
+}
+
+html[data-theme="light"] .bar-fill {
+  background: linear-gradient(90deg, var(--accent), #c990a4);
 }
 </style>
