@@ -13,6 +13,12 @@ PHASE_KEYS = {
     "亲近": "close",
     "依恋": "attached",
 }
+TENDENCY_KEYS = {
+    "wary": "戒备",
+    "clingy": "黏人",
+    "devoted": "信赖",
+    "steady": "安定",
+}
 
 
 def clamp(value: float, lo: float, hi: float) -> float:
@@ -39,6 +45,23 @@ def phase_key_of(values: dict[str, float]) -> tuple[str, str]:
     """返回 (阶段 key, 阶段中文名)。"""
     label = phase_of(values)
     return PHASE_KEYS.get(label, "stranger"), label
+
+
+def tendency_of(
+    values: dict[str, float], interaction_count: int = 0
+) -> tuple[str, str]:
+    """依恋倾向（M5）：由依赖/信任比与互动次数推导，返回 (key, 中文名)。"""
+    trust = float(values.get("trust", 0.0))
+    dependence = float(values.get("dependence", 0.0))
+    vigilance = float(values.get("vigilance", 0.0))
+    if vigilance >= 40 or trust < 15:
+        return "wary", TENDENCY_KEYS["wary"]
+    ratio = dependence / max(trust, 1.0)
+    if dependence >= 15 and ratio >= 1.2:
+        return "clingy", TENDENCY_KEYS["clingy"]
+    if trust >= 30 and interaction_count >= 20:
+        return "devoted", TENDENCY_KEYS["devoted"]
+    return "steady", TENDENCY_KEYS["steady"]
 
 
 def _apply_values(

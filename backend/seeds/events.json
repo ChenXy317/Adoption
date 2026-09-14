@@ -274,5 +274,89 @@
     "cooldown_minutes": 5760,
     "priority": 21,
     "enabled": true
+  },
+  {
+    "key": "manual_movie",
+    "name": "一起看电影",
+    "category": "manual",
+    "trigger": {"all": [{"type": "attr", "key": "trust", "op": ">=", "value": 22}]},
+    "cost": {"money": 60, "time_minutes": 150},
+    "effects": {"attrs": {"mood": 6, "affection": 3, "trust": 1}},
+    "prompt_template": "你们去了电影院。她全程坐得很直，只在片子里的小猫出现时悄悄笑了一声；散场灯亮起，她还有点不好意思：「刚才……我笑出声了吗？」",
+    "once": false,
+    "cooldown_minutes": 5760,
+    "priority": 23,
+    "enabled": true
+  },
+  {
+    "key": "gift_small",
+    "name": "小礼物",
+    "category": "manual",
+    "trigger": {"all": [{"type": "attr", "key": "trust", "op": ">=", "value": 8}]},
+    "cost": {"money": 80, "time_minutes": 20},
+    "effects": {"attrs": {"affection": 2, "mood": 3}},
+    "prompt_template": "你顺路带回来一件小礼物——一条浅色的发绳。她捧着看了很久，小声问「是、是给我的吗」，耳朵悄悄红了，随后把它仔细绕在手腕上，又怕你笑她，赶紧藏进袖子里。",
+    "once": false,
+    "cooldown_minutes": 1440,
+    "priority": 27,
+    "enabled": true
+  },
+  {
+    "key": "gift_large",
+    "name": "大礼物",
+    "category": "manual",
+    "trigger": {"all": [{"type": "attr", "key": "trust", "op": ">=", "value": 20}]},
+    "cost": {"money": 300, "time_minutes": 30},
+    "effects": {"attrs": {"affection": 5, "mood": 6}, "flags": {"gift_large_given": true}},
+    "prompt_template": "你买回一条细细的银项链。她打开盒子的一瞬间愣住了，第一反应竟是摇头说太贵了；你替她戴上，她屏着呼吸一动不敢动，指尖轻轻碰了碰坠子，声音发颤：「我……可以收下吗。」",
+    "once": false,
+    "cooldown_minutes": 10080,
+    "priority": 28,
+    "enabled": true
+  },
+  {
+    "key": "story_gift_response",
+    "name": "她偷偷收好的心意",
+    "category": "fixed",
+    "trigger": {"all": [
+      {"type": "flag", "key": "gift_large_given", "value": true}
+    ]},
+    "cost": {},
+    "effects": {"attrs": {"dependence": 2, "trust": 1}, "flags": {"story_gift_response_done": true}},
+    "prompt_template": "第二天早上，你发现她把那条项链仔细收进了你给她的小布袋里，只在照镜子时偷偷戴上一下又摘下来。见你进来，她慌慌张张把盒子塞回抽屉：「我怕……弄丢了。」",
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 52,
+    "enabled": true
+  },
+  {
+    "key": "work_convenience",
+    "name": "便利店打工",
+    "category": "work",
+    "trigger": {},
+    "cost": {"time_minutes": 240},
+    "effects": {"attrs": {"money": 120}},
+    "prompt_template": "你出门去便利店打了四个小时的工：理货、补货、收银，忙到脚不沾地。回来时口袋里多了 120 元。",
+    "once": false,
+    "cooldown_minutes": 0,
+    "priority": 15,
+    "enabled": true
+  },
+  {
+    "key": "proactive_evening_message",
+    "name": "她的晚间消息",
+    "category": "fixed",
+    "trigger": {"all": [
+      {"type": "period", "in": ["night"]},
+      {"type": "hour", "op": ">=", "value": 19},
+      {"type": "attr", "key": "affection", "op": ">=", "value": 15}
+    ]},
+    "cost": {},
+    "effects": {"attrs": {"mood": 2, "affection": 1}},
+    "prompt_template": "手机亮了一下，是她发来的消息：「……你、你什么时候回来？饭我温在锅里了。要是忙的话……也不用急着回。」",
+    "once": false,
+    "cooldown_minutes": 2880,
+    "priority": 38,
+    "enabled": true
   }
 ]

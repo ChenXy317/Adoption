@@ -57,6 +57,13 @@ _DEFAULT_STAGES = {
     "attached": "她高度依赖与信任你，主动寻求陪伴，情绪因你波动，语气亲密自然。",
 }
 
+_DEFAULT_TENDENCIES = {
+    "wary": "她仍把你当作需要小心对待的人，靠近前会先观察你的反应。",
+    "clingy": "她把你当成唯一的依靠，你离开视线久了就会不安、反复确认你还在。",
+    "devoted": "她确信自己不会被抛下，会主动分享想法和小事，语气放松。",
+    "steady": "她在你身边慢慢放松，但遇事仍习惯先自己忍一忍、再小声试探。",
+}
+
 
 def _attr_line(defs: list[AttributeDef], values: dict[str, float]) -> str:
     parts = []
@@ -116,6 +123,15 @@ def _stage_note(character: Character, phase_key: str, phase_label: str) -> str:
     if not note:
         note = _DEFAULT_STAGES.get(phase_key, "")
     return f"关系阶段：{phase_label}（{note}）" if note else f"关系阶段：{phase_label}"
+
+
+def _tendency_note(character: Character, tendency_key: str, tendency_label: str) -> str:
+    persona = character.persona or {}
+    tendencies = persona.get("tendencies") or {}
+    note = _value_text(tendencies.get(tendency_key) or "")
+    if not note:
+        note = _DEFAULT_TENDENCIES.get(tendency_key, "")
+    return f"当前倾向：{tendency_label}（{note}）" if note else f"当前倾向：{tendency_label}"
 
 
 def _event_block(events: list[dict]) -> str:
@@ -180,6 +196,8 @@ def build_messages(
     active_events: list[dict] | None = None,
     active_scene: dict | None = None,
     memories: list[dict] | None = None,
+    tendency: tuple[str, str] | None = None,
+    mood_label: str = "",
 ) -> list[dict]:
     """组装 OpenAI 兼容消息列表（单条 system + 最近消息）。"""
     abs_minutes = clock.absolute_minutes(save.game_minutes, settings)
@@ -196,12 +214,17 @@ def build_messages(
     samples = _sample_lines_block(character)
     if samples:
         system_parts.append(samples)
-    system_parts.append(
-        "# 当前状态\n"
-        f"虚拟时间：{clock.full_label(abs_minutes)}\n"
-        f"{_stage_note(character, phase_key, phase_label)}\n"
-        f"属性：{_attr_line(defs, values)}"
-    )
+    state_lines = [
+        "# 当前状态",
+        f"虚拟时间：{clock.full_label(abs_minutes)}",
+        _stage_note(character, phase_key, phase_label),
+    ]
+    if tendency:
+        state_lines.append(_tendency_note(character, tendency[0], tendency[1]))
+    if mood_label:
+        state_lines.append(f"她此刻的心情：{mood_label}")
+    state_lines.append(f"属性：{_attr_line(defs, values)}")
+    system_parts.append("\n".join(state_lines))
     scene_text = scenes.scene_block(active_scene) if active_scene else ""
     if scene_text:
         system_parts.append(scene_text)

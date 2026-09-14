@@ -9,6 +9,7 @@ from game.attributes import (
     clamp,
     phase_key_of,
     phase_of,
+    tendency_of,
 )
 from game.prompt import (
     _event_block,
@@ -224,6 +225,33 @@ class PhaseTest(unittest.TestCase):
         self.assertEqual(
             phase_key_of({"affection": 95, "trust": 95, "dependence": 95})[0],
             "attached",
+        )
+
+
+class TendencyTest(unittest.TestCase):
+    def test_wary_when_vigilance_high(self):
+        key, label = tendency_of({"trust": 30, "dependence": 40, "vigilance": 60})
+        self.assertEqual(key, "wary")
+        self.assertEqual(label, "戒备")
+
+    def test_wary_when_trust_low(self):
+        self.assertEqual(
+            tendency_of({"trust": 10, "dependence": 5, "vigilance": 10})[0], "wary"
+        )
+
+    def test_clingy_when_dependence_outweighs_trust(self):
+        self.assertEqual(
+            tendency_of({"trust": 20, "dependence": 40, "vigilance": 10})[0], "clingy"
+        )
+
+    def test_devoted_needs_trust_and_interactions(self):
+        values = {"trust": 50, "dependence": 20, "vigilance": 5}
+        self.assertEqual(tendency_of(values, 30)[0], "devoted")
+        self.assertEqual(tendency_of(values, 5)[0], "steady")
+
+    def test_steady_default(self):
+        self.assertEqual(
+            tendency_of({"trust": 25, "dependence": 5, "vigilance": 10})[0], "steady"
         )
 
 

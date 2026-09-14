@@ -20,10 +20,16 @@ from ai_client import AIClientError, ai
 from config import CHAT_HISTORY_MESSAGES, EVENT_RECENT_WINDOW_MINUTES
 from db import SessionLocal
 from game import clock, events, memory, scenes
-from game.attributes import apply_deltas, phase_of
+from game.attributes import apply_deltas, phase_of, tendency_of
 from game.prompt import build_messages
 from game.tags import StateTagStripper, parse_state
-from helpers import get_runtime, get_save_or_error, load_attr_values, save_settle_lock
+from helpers import (
+    behavior_count,
+    get_runtime,
+    get_save_or_error,
+    load_attr_values,
+    save_settle_lock,
+)
 from orm import AttributeDef, Character, Message, Save
 from schemas import ChatIn
 
@@ -96,6 +102,7 @@ def _prepare(save_id: int, message: str) -> dict:
         if memories:
             memory.mark_recalled(session, [m["id"] for m in memories])
             session.commit()
+        flags = events.load_flags(session, save_id)
         messages = build_messages(
             save,
             character,
@@ -106,6 +113,8 @@ def _prepare(save_id: int, message: str) -> dict:
             active_events,
             active_scene,
             memories,
+            tendency=tendency_of(values, behavior_count(session, save_id)),
+            mood_label=str(flags.get("mood_label") or ""),
         )
         return {
             "messages": messages,
@@ -138,6 +147,8 @@ def _settle(save_id: int, text: str, tag_raw: str, interrupted: bool) -> dict:
             changes: list[dict] = []
             raw_advance = None
             raw_scene = None
+            applied_flags: dict = {}
+            mood_label = ""
             if state is not None:
                 raw_attrs = state.get("attrs")
                 updated, changes = apply_deltas(
@@ -150,6 +161,13 @@ def _settle(save_id: int, text: str, tag_raw: str, interrupted: bool) -> dict:
                     raw_advance = raw_time.get("advance_minutes")
                 if isinstance(state.get("scene"), dict):
                     raw_scene = state.get("scene")
+                applied_flags = events.apply_ai_flags(
+                    session, save_id, state.get("flags")
+                )
+                raw_mood = state.get("mood_label")
+                if isinstance(raw_mood, str) and raw_mood.strip():
+                    mood_label = raw_mood.strip()[:32]
+                    events.set_flag(session, save_id, "mood_label", mood_label)
             if raw_advance is None:
                 time_advance = default_advance
             else:
@@ -161,6 +179,10 @@ def _settle(save_id: int, text: str, tag_raw: str, interrupted: bool) -> dict:
 
             abs_before = clock.absolute_minutes(old_game, settings)
             meta: dict = {"attrs": changes, "time_advance": time_advance}
+            if applied_flags:
+                meta["flags"] = applied_flags
+            if mood_label:
+                meta["mood_label"] = mood_label
             if interrupted:
                 meta["interrupted"] = True
             if state is None:
@@ -213,6 +235,8 @@ def _settle(save_id: int, text: str, tag_raw: str, interrupted: bool) -> dict:
                 "changes": combined,
                 "ai_changes": changes,
                 "phase": phase_of(values),
+                "tendency": tendency_of(values, behavior_count(session, save_id)),
+                "mood_label": mood_label,
                 "time_advance": total_advance,
                 "game_minutes": save.game_minutes,
                 "virtual": virtual,
@@ -307,12 +331,14 @@ async def chat(save_id: int, req: ChatIn, background: BackgroundTasks):
                 {"code": "save_not_found", "message": "存档不存在或已被删除"},
             )
             return
-        if settled["changes"]:
+        if settled["changes"] or settled["mood_label"]:
             yield sse(
                 "state_update",
                 {
                     "attrs": settled["changes"],
                     "phase": settled["phase"],
+                    "tendency": settled["tendency"],
+                    "mood_label": settled["mood_label"],
                     "game_minutes": settled["game_minutes"],
                     "virtual_label": settled["virtual"]["label"],
                 },

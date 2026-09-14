@@ -9,9 +9,10 @@ from sqlalchemy.orm import Session
 
 from db import get_session
 from game import clock, events, scenes
-from game.attributes import phase_of
+from game.attributes import phase_of, tendency_of
 from helpers import (
     attribute_items,
+    behavior_count,
     character_dict,
     get_save_or_error,
     load_attr_values,
@@ -21,6 +22,43 @@ from orm import AttributeDef, Character, EventDef, EventLog, Message
 router = APIRouter(tags=["state"])
 
 MESSAGES_MAX_LIMIT = 200
+WALLET_FLOW_LIMIT = 8
+
+
+def _wallet_flows(session: Session, save_id: int) -> list[dict]:
+    """最近金钱收支（来源为 event_logs 的效果与扣除明细）。"""
+    rows = list(
+        session.scalars(
+            select(EventLog)
+            .where(EventLog.save_id == save_id)
+            .order_by(EventLog.id.desc())
+            .limit(WALLET_FLOW_LIMIT * 2)
+        )
+    )
+    flows: list[dict] = []
+    for log in rows:
+        meta = log.meta or {}
+        amount = 0.0
+        for change in meta.get("attrs") or []:
+            if change.get("key") == "money":
+                amount += float(change.get("delta") or 0)
+        for change in meta.get("cost_attrs") or []:
+            if change.get("key") == "money":
+                amount += float(change.get("delta") or 0)
+        if amount == 0:
+            continue
+        abs_at = int(log.game_minutes_at or 0)
+        flows.append({
+            "id": log.id,
+            "name": meta.get("name") or meta.get("key") or "事件",
+            "category": meta.get("category", ""),
+            "amount": round(amount, 2),
+            "game_minutes_at": abs_at,
+            "virtual_label": clock.time_label(abs_at),
+        })
+        if len(flows) >= WALLET_FLOW_LIMIT:
+            break
+    return flows
 
 
 @router.get("/api/saves/{save_id}/state")
@@ -57,6 +95,8 @@ def get_state(save_id: int, session: Session = Depends(get_session)):
             "game_minutes_at": abs_at,
             "virtual_label": clock.time_label(abs_at),
         })
+    action_items = events.manual_candidates(session, save, values)
+    flags = events.load_flags(session, save_id)
     return {
         "save": {
             "id": save.id,
@@ -67,6 +107,8 @@ def get_state(save_id: int, session: Session = Depends(get_session)):
         },
         "character": character_dict(character),
         "phase": phase_of(values),
+        "tendency": tendency_of(values, behavior_count(session, save_id))[1],
+        "mood_label": str(flags.get("mood_label") or ""),
         "virtual": {
             "absolute_minutes": absolute,
             **split,
@@ -76,7 +118,13 @@ def get_state(save_id: int, session: Session = Depends(get_session)):
         "money": values.get("money", 0.0),
         "active_scene": scenes.public_active(active_flag),
         "recent_events": recent_events,
-        "manual_events": events.manual_candidates(session, save, values),
+        "manual_events": [
+            item for item in action_items if item.get("category") == "manual"
+        ],
+        "work_actions": [
+            item for item in action_items if item.get("category") == "work"
+        ],
+        "wallet_flows": _wallet_flows(session, save_id),
     }
 
 

@@ -67,7 +67,7 @@ def trigger_manual(
         event = session.scalar(select(EventDef).where(EventDef.key == event_key))
         if event is None:
             error("event_not_found", f"事件不存在：{event_key}", 404)
-        if event.category != "manual":
+        if event.category not in ("manual", "work"):
             error("not_manual", "该事件不是手动事件，无法从行动菜单触发", 400)
 
         settings = save.settings or {}
@@ -120,8 +120,9 @@ def trigger_manual(
             ctx,
             values,
             defs_map,
-            source="manual",
+            source="work" if event.category == "work" else "manual",
             extra_advance=cost_time,
+            extra_meta={"cost": cost, "cost_attrs": cost_changes},
         )
         settled = events.settle_time(
             session,

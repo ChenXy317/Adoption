@@ -135,6 +135,8 @@ class EvaluateTest(unittest.TestCase):
         self.assertTrue(evaluate(
             {"type": "game_day", "op": ">=", "value": 3}, ctx
         ))
+        self.assertTrue(evaluate({"type": "hour", "op": ">=", "value": 20}, ctx))
+        self.assertFalse(evaluate({"type": "hour", "op": "<", "value": 20}, ctx))
         self.assertTrue(evaluate({"type": "date", "month": 5, "day": 3}, ctx))
         self.assertFalse(evaluate({"type": "date", "month": 6}, ctx))
         self.assertTrue(evaluate(

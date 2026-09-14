@@ -71,7 +71,7 @@ export const useChatStore = defineStore("chat", {
               assistant.content += data.text;
             },
             state_update: (data) => {
-              game.applyAttrs(data.attrs, data.phase);
+              game.applyAttrs(data.attrs, data.phase, data);
             },
             event_triggered: (data) => {
               eventTriggered = true;

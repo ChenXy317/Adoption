@@ -42,7 +42,7 @@ export const useGameStore = defineStore("game", {
     async endScene(id, payload = {}) {
       return apiPost(`/api/saves/${id}/scenes/end`, payload);
     },
-    applyAttrs(changes, phase = null) {
+    applyAttrs(changes, phase = null, extra = {}) {
       if (!this.current) return;
       for (const change of changes || []) {
         const attr = this.current.attributes.find((a) => a.key === change.key);
@@ -51,6 +51,8 @@ export const useGameStore = defineStore("game", {
       const money = this.current.attributes.find((a) => a.key === "money");
       if (money) this.current.money = money.value;
       if (phase) this.current.phase = phase;
+      if (extra.tendency) this.current.tendency = extra.tendency;
+      if (extra.mood_label !== undefined) this.current.mood_label = extra.mood_label;
     },
     applyTime({ virtual, game_minutes } = {}) {
       if (!this.current) return;

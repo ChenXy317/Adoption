@@ -8,11 +8,20 @@ import re
 import threading
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from config import DEFAULT_MAX_TOKENS, DUMMY_API_KEY
-from orm import AttributeDef, AttributeValue, CatalogModel, Character, Provider, Save
+from orm import (
+    AttributeDef,
+    AttributeValue,
+    CatalogModel,
+    Character,
+    EventLog,
+    Message,
+    Provider,
+    Save,
+)
 
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 ENV_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,63}$")
@@ -197,3 +206,16 @@ def load_attr_values(session: Session, save_id: int) -> dict[str, float]:
         select(AttributeValue).where(AttributeValue.save_id == save_id)
     )
     return {r.attr_key: r.value for r in rows}
+
+
+def behavior_count(session: Session, save_id: int) -> int:
+    """互动计数：玩家发言数 + 已触发事件数（性格倾向推导用）。"""
+    user_messages = session.scalar(
+        select(func.count(Message.id)).where(
+            Message.save_id == save_id, Message.role == "user"
+        )
+    ) or 0
+    triggered = session.scalar(
+        select(func.count(EventLog.id)).where(EventLog.save_id == save_id)
+    ) or 0
+    return int(user_messages) + int(triggered)

@@ -1,6 +1,6 @@
 # STATUS — 当前状态记录
 
-> 更新时间：2026-09-14（M4 已提交 `2ecceb3`；M4 后全量审查修复已完成，未提交）
+> 更新时间：2026-09-14（M5 行动与经济已完成，未提交；M4 后审查修复一并未提交）
 > 用途：跨会话交接。新会话先读 `PLAN.md`（唯一真相源）+ 本文件，再动手。
 
 ## 一、项目速览
@@ -20,8 +20,9 @@
 | 全量审查修复 | 已完成，已提交 `d55e9e0` |
 | M3.5 多轮场景（场景引擎、STATE scene、场景接口、SceneBanner、场景种子） | 已完成，已提交 `5551cd0` |
 | M4 记忆系统（总结流水线与互斥任务、检索注入、记忆面板、场景记忆） | 已完成，已提交 `2ecceb3` |
-| M4 后全量审查修复（结算顺序、场景接力、总结任务兜底、集成测试） | **已完成，未提交** |
-| M5 行动与经济 | 未开工（下一步，见第八节） |
+| M4 后全量审查修复（结算顺序、场景接力、总结任务兜底、集成测试） | 已完成，未提交 |
+| M5 行动与经济（打工+钱包、送礼两档、冷落、性格倾向、主动消息、事件链） | **已完成，未提交** |
+| M6 打磨 | 未开工（下一步） |
 
 ## 三、运行方式
 
@@ -30,14 +31,14 @@
 - 服务端口：**18730**（`APP_PORT` 可配）；启动后浏览器开 `http://127.0.0.1:18730`
 - 启动：双击 `快速启动.bat`（缺 dist 会自动构建）；或手动：
   `cd backend; .venv\Scripts\python.exe main.py`
-- 测试：`cd backend; .venv\Scripts\python.exe -m unittest discover -s tests`（**97 项**，含 9 项 DB 集成测试）
+- 测试：`cd backend; .venv\Scripts\python.exe -m unittest discover -s tests`（**107 项**，含 14 项 DB 集成测试）
 - 前端：改动后 `cd frontend; npm run build`（后端托管 dist）；开发模式 `npm run dev`（Vite 代理 18730）
 
 ## 四、数据现状（库内）
 
 - 女主角：**小澄**（19 岁）——内置设定书 `backend/seeds/character.json`，启动装载并以种子为准覆盖
 - 存档：仅 `id=6「雨夜」`（6 条消息，`aihubmix:xiaomi-mimo-v2.5-free`）；M4 自检档均已清理
-- 事件定义 18 条（`backend/seeds/events.json`）；场景定义 3 条（`backend/seeds/scenes.json`）——同 M3.5
+- 事件定义 18 条（`backend/seeds/events.json`）；场景定义 3 条（`backend/seeds/scenes.json`）——M5 新增 6 条事件（打工/送礼两档/电影/礼物回响链/主动消息），共 **24 条**
 - 记忆：正式档暂无；场景结束会写 `memories`（event/relationship），总结流水线也会写入
 - 属性 tick 已生效：mood `regress`（回归 50，0.5/时）、vigilance `decay`（1/时）
 - 供应商同前：`aihubmix` / `openrouter`（均 `use_env_key`，库内无明文密钥）
@@ -80,9 +81,28 @@
 - 新增 `tests/test_integration.py`（9 项，使用独立 `new_idea_test` 库、自动建删）：结算 tick/固定事件/跨日随机、场景生命周期与不接力、手动结束不接力、advance 时间说明、对话结算（含解析失败兜底）、记忆总结流水线与失败落库、422 错误格式
 - `PLAN.md` §5.3/§7/§9 明确：事件/场景定义 CRUD 推迟（当前以种子文件维护，列入 M6 之后）
 
+**M5 行动与经济（未提交，2026-09-14）**
+
+后端
+- `game/events.py`：`manual_candidates` 纳入 `work` 分类（返回 category）；`apply_event` 支持 `extra_meta`（manual 扣费明细入日志）与事件 effects 的 `unlock_scenes`；`_leaf` 新增 `hour` 条件；新增 `apply_ai_flags`（拒绝系统保留键 / `scene_`、`event_` 前缀 / 非法值）；新增 `apply_neglect` 冷落结算（距上次对话 ≥ 阈值天数后按超时天数增量扣好感，单次上限，`settings.neglect` 可覆盖）；`set_flag` 复制 dict 存储（修复就地修改 JSON 值导致 ORM 漏检变更的缺陷，随机判定同受益）
+- `game/attributes.py`：新增 `tendency_of`（戒备/黏人/信赖/安定，依赖/信任比 + 互动计数）
+- `game/prompt.py`：当前状态块注入「当前倾向」与「她此刻的心情」；新增 `_tendency_note` 与通用兜底
+- `routes/chat.py`：解析并应用 STATE 的 `flags` 与 `mood_label`，写入消息 meta 与 SSE state_update；prompt 注入倾向与心情
+- `routes/events.py`：放行 `work` 分类触发；扣费明细写 event_logs
+- `routes/state.py`：返回 `tendency` / `mood_label` / `work_actions` / `wallet_flows`（收支来源 event_logs）
+- `helpers.py`：新增 `behavior_count`（互动计数）
+- 种子：`events.json` 新增打工（4h→+120）、小礼物（¥80/好感+2）、大礼物（¥300/好感+5，写 flag 触发回响事件链）、看电影（¥60）、她的晚间消息（主动消息）、礼物回响（事件链）；`character.json` 新增 `tendencies` 四类描述
+
+前端
+- `WalletPanel.vue`（新）：余额 + 打工入口 + 最近收支；`Game.vue` 接入并展示关系倾向与心情
+- `stores/game.js` / `stores/chat.js`：state_update 同步倾向与心情
+
+测试
+- `test_game.py` 新增倾向 5 项；`test_events.py` 补 hour 条件；`test_integration.py` 新增 M5 五项（打工与钱包、送礼与事件链、冷落增量与上限、AI flags/心情、主动消息）
+
 ## 六、验证记录（2026-09-14）
 
-- `unittest` **97 项**全过（纯函数 88 + DB 集成 9）；`npm run build` 通过
+- `unittest` **107 项**全过（纯函数 93 + DB 集成 14）；`npm run build` 通过
 - httpx 端到端（真实模型 aihubmix，临时档已清理，21 项全过）：22 条消息 → 达阈值登记 pending 任务 → 总结新增 6 条（抽取质量抽检良好）→ 进度推进 / 未总结清零 / 任务 done → 记忆 CRUD → prompt 注入「长期记忆」且召回计数更新 → 模型缺失时失败状态落库
 - 浏览器实测：记忆弹层打开（未总结 22 条）→ 手动总结 → 6 条记忆上屏 → 归档 → 恢复
 
@@ -99,14 +119,15 @@
 - **结算顺序**：`ordered_changes` 为唯一权威的属性变化序列（AI → tick → 事件/场景效果），前端按序覆盖后再以 state 刷新兜底
 - **总结任务兜底**：任何异常都会把 job 落 failed（不卡 running）；总结模型优先级 `save.settings.memory_model` → `MEMORY_MODEL` → 存档主模型
 - **随机判定**：跨日判定写 `random_rolls` 后 flush；场景/事件推进跨日同样登记，避免当日判定丢失
+- **M5 口径**：打工 = `category="work"` 的确定性事件（时间换钱、固定模板消息、不走 AI）；送礼/消费 = manual 事件（cost + effects + 专属 prompt_template，AI 在下一轮对话承接演出）；冷落 = 距上次 user/assistant 消息 ≥3 游戏日，按超时天数增量扣好感（-1/日、单次上限 -5、`save_flags.neglect` 记录已扣天数，对话后自动重置）；倾向 = `tendency_of(属性, 互动计数)`；主动消息 = 带 period/hour 条件的 fixed 事件（随推进返回并上前端）
+- **AI flags 白名单**：仅允许 `^[a-z][a-z0-9_]{0,63}$`，拒绝 `active_scene`/`random_rolls`/`neglect`/`mood_label` 与 `scene_`/`event_` 前缀；`mood_label` 单独存 flag 并注入 prompt
 
-## 八、下一步 M5（行动与经济）建议顺序（PLAN 5.8）
+## 八、下一步 M6（打磨）建议顺序
 
-1. 打工 manual 事件（4 小时 → +120，固定模板消息不耗 AI）+ 钱包面板收支
-2. 送礼两档（¥80 / 好感+2；¥300 / 好感+5）与付费手动事件种子扩充（价目已定稿 PLAN §10）
-3. 冷落规则（两次互动推进 ≥3 游戏日且无对话 → 好感 -1/日，单次上限 -5）
-4. 性格演化（阶段倾向）与主动消息（推进越过时点触发，随推进 SSE 推送）
-5. 事件链扩充（配合「事件 ⇄ 场景」混合链）
+1. 轻量导出备份（存档 JSON 全量导出/恢复，PLAN §9 M6）
+2. 事件/场景定义管理界面（PLAN §5.3/§7 推迟项：event-defs/scene-defs CRUD + EventDefEditor/SceneDefEditor）
+3. 主题（ThemeModal）与 README 收尾；向量检索（可选）
+4. 如需扩展 M5：付费手动事件触发后立即 AI 演出（当前为事件消息 + 下一轮承接）、更多打工/礼物种子
 
 ## 九、环境坑与约定（踩过的雷）
 
@@ -124,7 +145,7 @@
 
 ## 十、给下一个会话的建议
 
-- 动手前：读 `PLAN.md` + 本文件 → `git status`（M4 后审查修复未提交）→ 建议先提交这批修复再开工 M5
+- 动手前：读 `PLAN.md` + 本文件 → `git status`（审查修复 + M5 未提交）→ 建议先提交再开工 M6
 - 后端改动需重启服务（未开 reload）；前端改动需 `npm run build`
 - 验证习惯：先 `unittest` → 再 httpx 端到端（含 SSE/真实模型）→ 最后浏览器实测
 - 聊天验证注意选可用模型（aihubmix 的 `xiaomi-mimo-v2.5-free`）；总结同样走该模型（或配 `MEMORY_MODEL`）

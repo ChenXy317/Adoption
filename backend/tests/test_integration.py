@@ -18,7 +18,9 @@ from sqlalchemy.orm import sessionmaker
 
 import routes.advance as advance_route
 import routes.chat as chat_route
+import routes.events as events_route
 import routes.scenes as scenes_route
+import routes.state as state_route
 from config import (
     MYSQL_CHARSET,
     MYSQL_DATABASE,
@@ -158,6 +160,10 @@ class SettlementIntegrationTest(unittest.TestCase):
                 default_value=30,
                 tick_rule={"mode": "decay", "amount_per_hour": 1},
                 ai_editable=True, enabled=True, sort=40,
+            ),
+            AttributeDef(
+                key="dependence", name="依赖", category="stat", min=0, max=100,
+                default_value=0, ai_editable=True, enabled=True, sort=45,
             ),
             AttributeDef(
                 key="money", name="金钱", category="resource", min=0, max=10**9,
@@ -425,6 +431,145 @@ class SettlementIntegrationTest(unittest.TestCase):
         reloaded = load_attr_values(session, save.id)
         self.assertAlmostEqual(reloaded["vigilance"], 29.5)
         self.assertAlmostEqual(reloaded["mood"], 59.75)
+
+    # ── M5 行动与经济 ──
+
+    def test_work_action_and_wallet(self):
+        session = self._session()
+        defs = self._defs(session)
+        save, _values = self._save(session, defs)
+        session.add(
+            EventDef(
+                key="work_x", name="便利店打工", category="work", trigger={},
+                cost={"time_minutes": 240}, effects={"attrs": {"money": 120}},
+                prompt_template="打了四个小时的工。", once=False,
+                cooldown_minutes=0, priority=15, enabled=True,
+            )
+        )
+        session.commit()
+        save_id = save.id
+
+        data = events_route.trigger_manual(save_id, "work_x", session=session)
+
+        self.assertEqual(data["advance_minutes"], 240)
+        self.assertEqual(data["changes"][0]["key"], "money")
+        session.commit()
+        self.assertEqual(load_attr_values(session, save_id)["money"], 2120.0)
+        state = state_route.get_state(save_id, session=session)
+        self.assertEqual(state["money"], 2120.0)
+        self.assertEqual([item["key"] for item in state["work_actions"]], ["work_x"])
+        self.assertEqual(state["manual_events"], [])
+        self.assertEqual(state["wallet_flows"][0]["amount"], 120.0)
+
+    def test_gift_action_and_event_chain(self):
+        session = self._session()
+        defs = self._defs(session)
+        save, _values = self._save(session, defs)
+        session.add_all([
+            EventDef(
+                key="gift_x", name="大礼物", category="manual", trigger={},
+                cost={"money": 300, "time_minutes": 30},
+                effects={"attrs": {"affection": 5}, "flags": {"gift_given": True}},
+                prompt_template="她收下了礼物。", once=False,
+                cooldown_minutes=0, priority=28, enabled=True,
+            ),
+            EventDef(
+                key="gift_follow", name="她的回应", category="fixed",
+                trigger={"all": [{"type": "flag", "key": "gift_given", "value": True}]},
+                effects={"attrs": {"dependence": 2}},
+                prompt_template="第二天她偷偷收好了礼物。", once=True,
+                cooldown_minutes=0, priority=52, enabled=True,
+            ),
+        ])
+        session.commit()
+        save_id = save.id
+
+        events_route.trigger_manual(save_id, "gift_x", session=session)
+
+        session.commit()
+        values = load_attr_values(session, save_id)
+        self.assertEqual(values["money"], 1700.0)
+        self.assertEqual(values["affection"], 15.0)
+        self.assertEqual(values["dependence"], 2.0)
+        self.assertTrue(events.load_flags(session, save_id).get("gift_given"))
+        chain = session.scalar(
+            select(EventLog)
+            .where(EventLog.save_id == save_id)
+            .order_by(EventLog.id.desc())
+        )
+        self.assertEqual((chain.meta or {}).get("key"), "gift_follow")
+        flow = state_route.get_state(save_id, session=session)["wallet_flows"][0]
+        self.assertEqual(flow["amount"], -300.0)
+
+    def test_neglect_penalty_is_incremental_and_capped(self):
+        session = self._session()
+        defs = self._defs(session)
+        save, _values = self._save(session, defs)
+        save_id = save.id
+
+        data = None
+        for _ in range(3):
+            data = advance_route.advance(
+                save_id, AdvanceIn(minutes=1440), session=session
+            )
+        self.assertEqual(data["changes"][-1]["source"], "neglect")
+        self.assertEqual(load_attr_values(session, save_id)["affection"], 9.0)
+
+        for _ in range(5):
+            advance_route.advance(save_id, AdvanceIn(minutes=1440), session=session)
+        self.assertEqual(load_attr_values(session, save_id)["affection"], 5.0)
+        neglect = events.load_flags(session, save_id).get("neglect") or {}
+        self.assertEqual(neglect.get("applied_days"), 5)
+
+    def test_chat_applies_ai_flags_and_mood_label(self):
+        session = self._session()
+        defs = self._defs(session)
+        save, _values = self._save(session, defs)
+        save_id = save.id
+
+        tag = (
+            '{"attrs": {"affection": 1},'
+            ' "flags": {"noted_scar": true, "active_scene": true, "scene_x": 1},'
+            ' "mood_label": "开心"}'
+        )
+        result = chat_route._settle(save_id, "她笑了笑。", tag, False)
+        self.assertEqual(result["mood_label"], "开心")
+
+        session.rollback()
+        flags = events.load_flags(session, save_id)
+        self.assertTrue(flags.get("noted_scar"))
+        self.assertNotIn("active_scene", flags)
+        self.assertNotIn("scene_x", flags)
+        self.assertEqual(flags.get("mood_label"), "开心")
+        self.assertEqual(
+            state_route.get_state(save_id, session=session)["mood_label"], "开心"
+        )
+
+    def test_proactive_event_on_advance(self):
+        session = self._session()
+        defs = self._defs(session)
+        save, _values = self._save(session, defs)
+        session.add(
+            EventDef(
+                key="proactive_x", name="她的晚间消息", category="fixed",
+                trigger={"all": [
+                    {"type": "period", "in": ["night"]},
+                    {"type": "hour", "op": ">=", "value": 19},
+                ]},
+                effects={"attrs": {"mood": 2}}, prompt_template="手机亮了一下。",
+                once=False, cooldown_minutes=0, priority=38, enabled=True,
+            )
+        )
+        session.commit()
+
+        data = advance_route.advance(
+            save.id, AdvanceIn(minutes=660), session=session
+        )
+
+        self.assertEqual([item["key"] for item in data["events"]], ["proactive_x"])
+        self.assertTrue(
+            any("手机亮了一下" in item["content"] for item in data["messages"])
+        )
 
     # ── 对话结算与记忆 ──
 

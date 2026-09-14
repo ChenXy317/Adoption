@@ -10,12 +10,19 @@
 from __future__ import annotations
 
 import random
+import re
 from dataclasses import dataclass, field
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from config import EVENT_MAX_PER_SETTLEMENT, TIME_MAX_JUMP_HOURS
+from config import (
+    EVENT_MAX_PER_SETTLEMENT,
+    NEGLECT_AFFECTION_MAX,
+    NEGLECT_AFFECTION_PER_DAY,
+    NEGLECT_DAYS,
+    TIME_MAX_JUMP_HOURS,
+)
 from game import clock
 from game.attributes import apply_effects, apply_ticks
 from orm import AttributeDef, AttributeValue, EventDef, EventLog, Message, Save, SaveFlag
@@ -149,6 +156,8 @@ def _leaf(cond: dict, ctx: EvalContext, *, skip_types: set[str] | None = None) -
         return compare(op, value, cond.get("value"))
     if kind == "game_day":
         return compare(op, ctx.game_day, cond.get("value"))
+    if kind == "hour":
+        return compare(op, ctx.hour, cond.get("value"))
     if kind == "period":
         raw = cond.get("in", cond.get("value"))
         wanted = raw if isinstance(raw, (list, tuple)) else [raw]
@@ -239,12 +248,37 @@ def load_flags(session: Session, save_id: int) -> dict[str, object]:
 
 
 def set_flag(session: Session, save_id: int, key: str, value) -> None:
-    payload = value if isinstance(value, dict) else {"value": value}
+    """写入 save_flags；dict 值复制存储，避免就地修改同一对象导致 ORM 漏检变更。"""
+    payload = dict(value) if isinstance(value, dict) else {"value": value}
     row = session.get(SaveFlag, (save_id, key))
     if row is None:
         session.add(SaveFlag(save_id=save_id, key=key, value=payload))
     else:
         row.value = payload
+
+
+AI_FLAG_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+_AI_FLAG_RESERVED = {"active_scene", "random_rolls", "neglect", "mood_label"}
+
+
+def apply_ai_flags(session: Session, save_id: int, flags) -> dict:
+    """应用 AI 状态标签里的 flags；拒绝系统保留键与非法键值（静默忽略）。"""
+    applied: dict = {}
+    if not isinstance(flags, dict):
+        return applied
+    for key, value in list(flags.items()):
+        name = str(key).strip()
+        if not AI_FLAG_RE.match(name) or name in _AI_FLAG_RESERVED:
+            continue
+        if name.startswith("scene_") or name.startswith("event_"):
+            continue
+        if not isinstance(value, (bool, int, float, str)):
+            continue
+        if isinstance(value, str):
+            value = value[:200]
+        set_flag(session, save_id, name, value)
+        applied[name] = value
+    return applied
 
 
 def load_event_stats(session: Session, save_id: int) -> tuple[set[int], dict[str, int]]:
@@ -349,8 +383,12 @@ def apply_event(
     *,
     source: str = "fixed",
     extra_advance: int = 0,
+    extra_meta: dict | None = None,
 ) -> dict:
-    """应用事件效果并落 event_logs + role=event 消息；返回触发结果。"""
+    """应用事件效果并落 event_logs + role=event 消息；返回触发结果。
+
+    extra_meta 用于附带调用方的补充信息（如 manual 事件的扣费明细）。
+    """
     effects = event.effects or {}
     attr_changes: list[dict] = []
     if effects.get("attrs"):
@@ -362,6 +400,8 @@ def apply_event(
         set_flag(session, save.id, str(key), value)
     for key in effects.get("unlock_events") or []:
         set_flag(session, save.id, f"event_unlocked:{key}", True)
+    for key in effects.get("unlock_scenes") or []:
+        set_flag(session, save.id, f"scene_unlocked:{key}", True)
     advance = _number(effects.get("advance_minutes")) or 0
     advance = max(0, int(advance)) + max(0, int(extra_advance))
     advance = min(advance, TIME_MAX_JUMP_HOURS * 60)
@@ -380,6 +420,7 @@ def apply_event(
             "attrs": attr_changes,
             "flags": flags,
             "advance_minutes": advance,
+            **(extra_meta or {}),
         },
         game_minutes_at=ctx.absolute,
     )
@@ -439,6 +480,65 @@ def _advance_core(
     write_changes(session, save.id, values, tick_changes)
     save.game_minutes = target
     return delta, tick_changes, clock.day_starts_between(old_abs, new_abs)
+
+
+def apply_neglect(
+    session: Session,
+    save: Save,
+    defs_map: dict[str, AttributeDef],
+    values: dict[str, float],
+    *,
+    now_abs: int,
+) -> list[dict]:
+    """冷落规则：距上次对话 ≥ 阈值游戏日且期间无对话时扣好感（增量式，单次有上限）。"""
+    cfg = (save.settings or {}).get("neglect")
+    cfg = cfg if isinstance(cfg, dict) else {}
+
+    def _int(name: str, default: int) -> int:
+        try:
+            return max(0, int(cfg.get(name, default)))
+        except (TypeError, ValueError):
+            return default
+
+    threshold_days = _int("days", NEGLECT_DAYS) or NEGLECT_DAYS
+    per_day = _int("per_day", NEGLECT_AFFECTION_PER_DAY) or NEGLECT_AFFECTION_PER_DAY
+    max_days = _int("max", NEGLECT_AFFECTION_MAX) or NEGLECT_AFFECTION_MAX
+
+    fallback = clock.absolute_minutes(0, save.settings or {})
+    last_dialogue = int(
+        session.scalar(
+            select(func.max(Message.game_minutes_at)).where(
+                Message.save_id == save.id,
+                Message.role.in_(("user", "assistant")),
+            )
+        )
+        or fallback
+    )
+    silent_days = max(0, int(now_abs) - last_dialogue) // clock.DAY_MINUTES
+    if silent_days < threshold_days:
+        return []
+
+    state_row = session.get(SaveFlag, (save.id, "neglect"))
+    state = _raw_flag(state_row.value) if state_row is not None else {}
+    if not isinstance(state, dict) or int(state.get("dialogue_at") or -1) != last_dialogue:
+        state = {"dialogue_at": last_dialogue, "applied_days": 0}
+    else:
+        state = dict(state)
+    target_days = min(max_days, silent_days - threshold_days + 1)
+    pending = max(0, target_days - int(state.get("applied_days") or 0))
+    if pending <= 0:
+        return []
+
+    state["applied_days"] = int(state.get("applied_days") or 0) + pending
+    set_flag(session, save.id, "neglect", state)
+    updated, changes = apply_effects(
+        defs_map, values, {"affection": -pending * per_day}
+    )
+    values.update(updated)
+    write_changes(session, save.id, values, changes)
+    for change in changes:
+        change["source"] = "neglect"
+    return changes
 
 
 def _random_roll_state(session: Session, save_id: int) -> dict:
@@ -701,6 +801,10 @@ def settle_time(
             )
 
     now_abs = clock.absolute_minutes(save.game_minutes, save.settings or {})
+    neglect_changes = apply_neglect(
+        session, save, defs_map, values, now_abs=now_abs
+    )
+    ordered_changes.extend(neglect_changes)
     scene_messages = [
         entry["message"]
         for entry in (scene_result["entered"], scene_result["ended"])
@@ -723,11 +827,14 @@ def manual_candidates(
     save: Save,
     values: dict[str, float],
 ) -> list[dict]:
-    """行动菜单可用的手动事件清单（含可用性与禁用原因）。"""
+    """行动菜单可用的手动/工作事件清单（含可用性与禁用原因）。"""
     event_defs = list(
         session.scalars(
             select(EventDef)
-            .where(EventDef.category == "manual", EventDef.enabled.is_(True))
+            .where(
+                EventDef.category.in_(("manual", "work")),
+                EventDef.enabled.is_(True),
+            )
             .order_by(EventDef.priority.desc(), EventDef.id)
         )
     )
@@ -750,6 +857,7 @@ def manual_candidates(
         items.append({
             "key": event.key,
             "name": event.name,
+            "category": event.category,
             "cost": cost,
             "available": ok,
             "reason": reason if not ok else "ok",

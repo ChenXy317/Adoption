@@ -24,15 +24,15 @@
           <div class="dim small" v-if="characterLine">{{ characterLine }}</div>
           <div class="phase" v-if="game.current?.phase">
             关系阶段：{{ game.current.phase }}
+            <template v-if="game.current?.tendency"> · {{ game.current.tendency }}</template>
+          </div>
+          <div class="phase" v-if="game.current?.mood_label">
+            此刻心情：{{ game.current.mood_label }}
           </div>
           <StatusBars :attributes="game.current?.attributes || []" />
         </section>
 
-        <section class="card panel">
-          <h3>钱包</h3>
-          <div class="money">¥ {{ money }}</div>
-          <div class="dim small">打工 / 送礼 / 消费将在后续版本开放</div>
-        </section>
+        <WalletPanel :save-id="$route.params.id" @triggered="onSettled" />
 
         <AdvancePanel :save-id="$route.params.id" @advanced="onSettled" />
 
@@ -70,6 +70,7 @@ import MemoryPanel from "../components/MemoryPanel.vue";
 import ModelCatalogModal from "../components/ModelCatalogModal.vue";
 import SceneBanner from "../components/SceneBanner.vue";
 import StatusBars from "../components/StatusBars.vue";
+import WalletPanel from "../components/WalletPanel.vue";
 import { useChatStore } from "../stores/chat";
 import { useGameStore } from "../stores/game";
 import { useUiStore } from "../stores/ui";
@@ -89,11 +90,6 @@ const characterLine = computed(() => {
   const c = game.current?.character;
   if (!c) return "";
   return `${c.name} · ${c.age} 岁 · ${c.relation}`;
-});
-
-const money = computed(() => {
-  const value = game.current?.money ?? 0;
-  return Math.round(value * 100) / 100;
 });
 
 async function load(saveId) {
