@@ -1,33 +1,51 @@
-# 养成 — 网页版 AI 养成游戏
+# 养成 — 网页版 AI 文字养成游戏
 
-纯网页端、AI 驱动的文字养成游戏（个人自用）。核心循环：**对话/互动 → 属性变化 → 事件触发 → 性格演化 → 新对话与新事件**。时间与现实完全隔离，使用纯虚拟时钟。
+单女主、注重人物刻画的 galgame 式文字养成游戏（个人自用，不对外发布）。
 
-详细设计见 [PLAN.md](PLAN.md)（唯一真相源）。
+核心循环：**对话 / 互动 → 属性变化 → 事件触发 → 性格演化 → 新的对话与事件**。时间与现实隔离，使用纯虚拟时钟；所有存档共用同一位女主角，每份存档从头开始这段关系。
+
+## 功能一览
+
+| 模块 | 说明 |
+|---|---|
+| 对话 | SSE 流式对话；模型回复经状态标签（STATE）驱动属性、心情与剧情标记 |
+| 属性与关系 | 多属性、关系阶段、性格倾向（戒备 / 黏人 / 信赖 / 安定）随互动演化 |
+| 虚拟时间 | 手动推进时间；属性随时间回归 / 衰减，跨日随机判定 |
+| 事件 | 固定 / 随机 / 手动三类事件：打工、送礼、看电影、事件链、主动消息 |
+| 场景 | 多轮剧情场景：设定注入、轮数上限、进入与结束结算、场景记忆 |
+| 记忆 | 对话总结流水线自动提炼长期记忆，按重要度与新近度检索注入后续对话 |
+| 经济 | 钱包收支、打工挣钱、礼物与消费、久未互动的冷落惩罚 |
+| 存档 | 多周目并存，单档全量导出 / 导入备份 |
+| 内容管理 | 事件 / 场景定义在线维护（支持对存档调试触发）、暗色 / 亮色主题 |
 
 ## 技术栈
 
-- 后端：Python 3.12+ / FastAPI / SQLAlchemy 2.0 + pymysql / MySQL 8 / OpenAI 兼容 SDK（SSE 流式）
-- 前端：Vue 3 + Vite + Pinia + vue-router
-- 部署：后端托管 `frontend/dist`，`.bat` 一键启动；单用户无登录
+- 后端：Python 3.14 / FastAPI / SQLAlchemy 2.0 + PyMySQL / MySQL 8 / OpenAI 兼容 SDK（SSE 流式）
+- 前端：Vue 3 + Vite + Pinia + Vue Router
+- 部署：后端托管前端 `dist`，`.bat` 一键启动；单用户无登录
 
 ## 目录结构
 
 ```
 backend/
   main.py config.py db.py orm.py schemas.py helpers.py ai_client.py
-  game/     clock.py tags.py attributes.py events.py scenes.py memory.py prompt.py
-  routes/   saves.py chat.py state.py advance.py events.py scenes.py memories.py defs.py catalog.py character.py
-  seeds/    内置女主角设定书、默认属性与事件定义 JSON
-  tests/    game/ 纯函数层单元测试
+  game/      clock.py tags.py attributes.py events.py scenes.py memory.py prompt.py
+  routes/    saves.py chat.py state.py advance.py events.py scenes.py memories.py
+             defs.py backup.py catalog.py character.py
+  seeds/     character.json attributes.json events.json scenes.json loader.py
+  tests/     test_game.py test_events.py test_scenes.py test_memory.py
+             test_ai_client.py test_integration.py
 frontend/
-  src/      views/ components/ stores/ api/ styles/ router/
+  src/       views/ components/ stores/ api/ router/ styles/
+一键启动.bat  环境检查 / 前端构建 / 启动服务 / 打开网页
+.env.example  环境变量模板
 ```
 
 ## 环境准备
 
-1. MySQL 8 已启动；密码写入系统环境变量 `MYSQL_PASSWORD`（或项目根 `.env`）。
-2. 复制 `.env.example` 为 `.env` 并按需修改（端口、库名默认为 `18730` / `new_idea`）。
-3. 后端依赖与虚拟环境：
+1. 安装并启动 MySQL 8，确保账号可连接。
+2. 数据库密码写入系统环境变量 `MYSQL_PASSWORD`，或复制 `.env.example` 为 `.env` 后在其中配置。数据库 `new_idea` 首次启动自动创建，无需手工建库。
+3. 后端依赖（需已安装 uv）：
 
 ```powershell
 cd backend
@@ -35,7 +53,7 @@ uv venv --python 3.14
 uv pip install -r requirements.txt
 ```
 
-4. 前端构建（首次或前端改动后）：
+4. 前端依赖与构建（需 Node 24）：
 
 ```powershell
 cd frontend
@@ -45,10 +63,16 @@ npm run build
 
 ## 启动
 
-- 日常启动：双击 `快速启动.bat`（自动检查环境 → 启动服务 → 打开浏览器 `http://127.0.0.1:18730`）。
-- 重置数据：双击 `重置启动.bat`（二次确认后删除数据库并重建）。
+双击 **`一键启动.bat`**：自动检查后端环境（缺失时创建）→ 前端源码有更新时自动重新构建 → 启动服务 → 等待就绪后打开浏览器 `http://127.0.0.1:18730`；若服务已在运行则直接打开网页。端口可用 `.env` 的 `APP_PORT` 修改。
 
-## 开发模式
+手动启动：
+
+```powershell
+cd backend
+.venv\Scripts\python.exe main.py
+```
+
+开发模式：
 
 ```powershell
 # 终端 1：后端（热重载可选 $env:UVICORN_RELOAD="1"）
@@ -58,6 +82,8 @@ cd backend; .venv\Scripts\python.exe main.py
 cd frontend; npm run dev
 ```
 
+> 后端改动需重启服务；前端改动需 `npm run build`（或使用开发模式）。
+
 ## 测试
 
 ```powershell
@@ -65,22 +91,30 @@ cd backend
 .venv\Scripts\python.exe -m unittest discover -s tests
 ```
 
+共 138 项：纯函数单测 + 接口 / 数据库集成测试。集成测试使用独立数据库 `new_idea_test`，自动创建与清理，需本机 MySQL 可用。
+
 ## 使用流程
 
-1. 首页「模型配置」：新建供应商（OpenAI 兼容接口，密钥可存库或读环境变量），添加模型并「测试」连通性。
-2. 「新建存档」：选对话模型并创建周目；所有存档共用同一位女主角，从头开始这段关系。
-3. 进入游戏：对话驱动属性与虚拟时间；右侧面板展示关系阶段、属性与金钱。
-4. 存档卡片「导出」把单个存档全量备份为 JSON 文件；首页「导入存档」可将备份恢复为新存档（原档不受影响）。
-5. 首页/游戏页「定义管理」查看与维护事件、场景定义（内置定义以种子为真相源，重启恢复字段、启停状态保留；支持对存档调试触发）；「主题」切换暗色 / 亮色。
+1. 首页「模型配置」：新建 OpenAI 兼容供应商（密钥可存库或读环境变量），添加模型并测试连通性。
+2. 「新建存档」：选择对话模型创建周目。
+3. 进入游戏：左侧对话，右侧查看关系阶段、属性、金钱、场景与事件；通过推进面板与互动菜单推进时间、打工、送礼。
+4. 存档卡片「导出」将单个存档备份为 JSON；首页「导入存档」可恢复为新存档。
+5. 「定义管理」在线维护事件 / 场景定义；「主题」切换暗色 / 亮色。
 
-## 女主角设定书（内置内容）
+## 内置内容（种子）
 
-- 完全设计好的内置角色，不在游戏界面暴露编辑；真相源为 `backend/seeds/character.json`，启动时自动装载（以种子为准覆盖库中记录）。
-- 修改设定：编辑该 JSON 后重启服务。
-- 深度字段：外貌/穿着/性格/说话风格/喜好/背景/关系史/日常/秘密/四阶段语气/参考台词。
-- 属性定义与事件同为内置种子（`backend/seeds/attributes.json`、`backend/seeds/events.json`），启动时以种子为准覆盖入库；改完重启生效（`enabled` 启停状态不受种子影响）。
+- 女主角「小澄」：完整设定书（外貌 / 穿着 / 性格 / 说话风格 / 背景 / 关系史 / 秘密 / 四阶段语气等），真相源为 `backend/seeds/character.json`，启动时以种子为准覆盖库中记录。
+- 属性定义与事件 / 场景定义同为内置种子（`backend/seeds/*.json`），启动时覆盖入库；库内的 `enabled` 启停状态不受种子影响。
+- 修改设定或新增定义：编辑对应 JSON 后重启服务即可；也可直接在「定义管理」界面维护。
 
-## 当前进度
+## 数据管理
 
-- 已完成：M1 骨架（数据模型建表与种子、存档 CRUD、模型目录、SSE 对话闭环、状态标签协议、Vue 基础界面）；M2 女主角刻画（内置设定书种子与启动装载、prompt 深度注入、属性定义种子与管理接口）；M3 事件与时间（虚拟时钟推进与属性 tick、三类事件引擎与事件种子、推进面板与互动菜单）；M3.5 多轮场景（场景种子与装载、进入/持续/结束/结算全生命周期、STATE 标签 scene 扩展、场景面板与手动收尾）；M4 记忆系统（总结流水线与互斥任务、永久记忆检索注入、记忆管理面板、场景记忆）；M4 后全量审查修复（结算顺序与场景接力修正、记忆任务兜底、新增 DB 集成测试）；M5 行动与经济（打工与钱包收支、送礼两档与付费事件、冷落规则、性格倾向、主动消息、STATE flags/mood_label）；M5 后全量审查修复（场景冷却起点、总结任务兜底、STATE 协议闭环、断流结算竞态、参数防御、种子启停保留）；M6 打磨（存档全量导出/恢复、事件/场景定义管理界面与调试触发、暗色/亮色主题）；M6 后全量审查修复（备份导入校验、场景收尾与钱包流水、事件情境去重、心情有效期、消息分页）。
-- 可选后置：向量检索（embedding top-K）、更多打工/礼物种子。
+- 数据全部存放于 MySQL 数据库 `new_idea`。
+- 需要清空数据时：停止服务后执行 `DROP DATABASE new_idea;`，下次启动自动重建（所有存档不可恢复，请先导出备份）。
+
+## 开发提示
+
+- 服务控制台窗口不能关闭（关闭即停止服务）。
+- PowerShell 直接调接口中文易乱码，接口自检建议使用 `backend/.venv` 的 Python + httpx，并设置 `PYTHONIOENCODING=utf-8`。
+- 属性数值列使用 `Double`；`SessionLocal` 为 `autoflush=False`，手动修改 ORM 行后、依赖查询前需先 flush。
+- 流式对话阶段不写数据库；状态标签解析失败会留痕 `meta.tag_debug`。

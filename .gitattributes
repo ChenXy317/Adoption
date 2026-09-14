@@ -1,0 +1,2 @@
+# 批处理文件固定为 CRLF 换行（cmd 解析含多字节内容时的必要条件）
+*.bat text eol=crlf
