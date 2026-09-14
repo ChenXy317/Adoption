@@ -23,6 +23,7 @@ import { ref } from "vue";
 
 import { useGameStore } from "../stores/game";
 import { useUiStore } from "../stores/ui";
+import { costText, reasonText } from "../utils/actions";
 
 const props = defineProps({
   saveId: { type: [Number, String], required: true },
@@ -33,25 +34,6 @@ const emit = defineEmits(["triggered"]);
 const game = useGameStore();
 const ui = useUiStore();
 const busyKey = ref("");
-
-const REASON_TEXT = {
-  locked: "条件未满足",
-  cooldown: "冷却中",
-  used: "已完成",
-  disabled: "已停用",
-  insufficient_money: "金钱不足",
-};
-
-function reasonText(reason) {
-  return REASON_TEXT[reason] || "不可用";
-}
-
-function costText(cost = {}) {
-  const parts = [];
-  if (cost.money) parts.push(`¥${cost.money}`);
-  if (cost.time_minutes) parts.push(`${cost.time_minutes} 分钟`);
-  return parts.join(" · ") || "免费";
-}
 
 async function run(item) {
   if (busyKey.value) return;

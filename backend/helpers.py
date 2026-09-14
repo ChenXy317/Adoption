@@ -11,7 +11,18 @@ from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from config import DEFAULT_MAX_TOKENS, DUMMY_API_KEY
+from config import (
+    CALENDAR_DEFAULT,
+    DEFAULT_MAX_TOKENS,
+    DUMMY_API_KEY,
+    NEGLECT_AFFECTION_MAX,
+    NEGLECT_AFFECTION_PER_DAY,
+    NEGLECT_DAYS,
+    TIME_DEFAULT_ADVANCE,
+    TIME_MAX_ADVANCE_PER_MESSAGE,
+    TIME_MAX_JUMP_HOURS,
+)
+from game import clock
 from orm import (
     AttributeDef,
     AttributeValue,
@@ -38,6 +49,96 @@ def save_settle_lock(save_id: int) -> threading.Lock:
             lock = threading.Lock()
             _save_locks[save_id] = lock
         return lock
+
+
+def drop_save_lock(save_id: int) -> None:
+    """存档删除后释放对应锁，避免锁表随存档数量增长。"""
+    with _save_locks_guard:
+        _save_locks.pop(save_id, None)
+
+
+def _clamp_int(value, lo: int, hi: int, default: int) -> int:
+    try:
+        result = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(lo, min(hi, result))
+
+
+def sanitize_settings(raw, base: dict | None = None) -> dict:
+    """钳制存档设置的关键数值（导入/更新共用）；base 提供局部覆盖字段的兜底值。"""
+    if not isinstance(raw, dict):
+        return {}
+    prior = base if isinstance(base, dict) else {}
+    out = dict(raw)
+
+    advance = out.get("advance")
+    if isinstance(advance, dict):
+        prior_advance = prior.get("advance")
+        prior_advance = prior_advance if isinstance(prior_advance, dict) else {}
+        cap = TIME_MAX_JUMP_HOURS * 60
+        out["advance"] = {
+            "default_minutes": _clamp_int(
+                advance.get("default_minutes"),
+                0,
+                cap,
+                _clamp_int(prior_advance.get("default_minutes"), 0, cap, TIME_DEFAULT_ADVANCE),
+            ),
+            "max_per_message": _clamp_int(
+                advance.get("max_per_message"),
+                1,
+                cap,
+                _clamp_int(
+                    prior_advance.get("max_per_message"), 1, cap,
+                    TIME_MAX_ADVANCE_PER_MESSAGE,
+                ),
+            ),
+        }
+
+    calendar = out.get("calendar")
+    if isinstance(calendar, dict):
+        prior_calendar = prior.get("calendar")
+        prior_calendar = prior_calendar if isinstance(prior_calendar, dict) else {}
+
+        def calendar_value(key: str, lo: int, hi: int) -> int:
+            return _clamp_int(
+                calendar.get(key),
+                lo,
+                hi,
+                _clamp_int(prior_calendar.get(key), lo, hi, CALENDAR_DEFAULT[key]),
+            )
+
+        out["calendar"] = {
+            "month": calendar_value("month", 1, 12),
+            "day": calendar_value("day", 1, clock.MONTH_DAYS),
+            "hour": calendar_value("hour", 0, 23),
+            "minute": calendar_value("minute", 0, 59),
+        }
+
+    neglect = out.get("neglect")
+    if isinstance(neglect, dict):
+        prior_neglect = prior.get("neglect")
+        prior_neglect = prior_neglect if isinstance(prior_neglect, dict) else {}
+
+        def neglect_value(key: str, lo: int, hi: int, default: int) -> int:
+            return _clamp_int(
+                neglect.get(key),
+                lo,
+                hi,
+                _clamp_int(prior_neglect.get(key), lo, hi, default),
+            )
+
+        out["neglect"] = {
+            "days": neglect_value("days", 0, 365, NEGLECT_DAYS),
+            "per_day": neglect_value("per_day", 0, 10, NEGLECT_AFFECTION_PER_DAY),
+            "max": neglect_value("max", 0, 100, NEGLECT_AFFECTION_MAX),
+        }
+
+    if "content_prompt" in out and not isinstance(out["content_prompt"], str):
+        out["content_prompt"] = ""
+    if "memory_model" in out and not isinstance(out["memory_model"], str):
+        out["memory_model"] = ""
+    return out
 
 
 def error(code: str, message: str, status: int = 400, detail: str = "") -> None:
@@ -151,15 +252,6 @@ def get_runtime(session: Session, model_key: str, *, http: bool = True) -> dict:
         "display_name": (catalog_model.display_name or "").strip()
         or catalog_model.model_id,
     }
-
-
-def find_model_key_references(session: Session, model_key: str) -> list[str]:
-    """返回引用该模型 key 的存档名列表（删除保护用）。"""
-    names = [
-        s.name
-        for s in session.scalars(select(Save).where(Save.model_key == model_key))
-    ]
-    return names
 
 
 def character_dict(character: Character | None) -> dict | None:

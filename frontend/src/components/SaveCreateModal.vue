@@ -51,7 +51,7 @@ const form = reactive({ name: "", model_key: "" });
 const characterLine = computed(() => {
   const ch = character.character;
   if (!ch) return "尚未创建女主角设定书";
-  return `${ch.name} · ${ch.age} 岁 · ${ch.relation}`;
+  return `${ch.name} · ${ch.age} 岁${ch.relation ? ` · ${ch.relation}` : ""}`;
 });
 
 onMounted(async () => {

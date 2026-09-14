@@ -21,11 +21,15 @@ from starlette.background import BackgroundTasks
 
 import routes.advance as advance_route
 import routes.backup as backup_route
+import routes.catalog as catalog_route
+import routes.character as character_route
 import routes.chat as chat_route
 import routes.defs as defs_route
 import routes.events as events_route
+import routes.saves as saves_route
 import routes.scenes as scenes_route
 import routes.state as state_route
+from ai_client import AIClientError
 from config import (
     MYSQL_CHARSET,
     MYSQL_DATABASE,
@@ -36,7 +40,8 @@ from config import (
 )
 from db import Base
 from game import clock, events, memory, scenes
-from helpers import load_attr_values
+import helpers
+from helpers import load_attr_values, save_settle_lock
 from orm import (
     AttributeDef,
     AttributeValue,
@@ -55,9 +60,13 @@ from orm import (
 )
 from schemas import (
     AdvanceIn,
+    CatalogModelIn,
+    CatalogModelPatch,
     ChatIn,
     EventDefIn,
     EventDefPatch,
+    ProviderIn,
+    SaveCreate,
     SceneDefIn,
     SceneDefPatch,
     SceneEndIn,
@@ -545,7 +554,8 @@ class SettlementIntegrationTest(unittest.TestCase):
 
         tag = (
             '{"attrs": {"affection": 1},'
-            ' "flags": {"noted_scar": true, "active_scene": true, "scene_x": 1},'
+            ' "flags": {"noted_scar": true, "active_scene": true, "scene_x": 1,'
+            ' "mood_label_at": 999999},'
             ' "mood_label": "开心"}'
         )
         result = chat_route._settle(save_id, "她笑了笑。", tag, False)
@@ -556,6 +566,7 @@ class SettlementIntegrationTest(unittest.TestCase):
         self.assertTrue(flags.get("noted_scar"))
         self.assertNotIn("active_scene", flags)
         self.assertNotIn("scene_x", flags)
+        self.assertEqual(flags.get("mood_label_at"), clock.absolute_minutes(0, {}))
         self.assertEqual(flags.get("mood_label"), "开心")
         self.assertEqual(
             state_route.get_state(save_id, session=session)["mood_label"], "开心"
@@ -1193,6 +1204,138 @@ class SettlementIntegrationTest(unittest.TestCase):
         )
         self.assertEqual(len(logs), 1)
         self.assertEqual((logs[0].meta or {}).get("source"), "debug")
+
+    # ── 设置钳制、锁回收与目录接口 ──
+
+    def test_save_settings_sanitized_and_lock_released(self):
+        session = self._session()
+        defs = self._defs(session)
+        self._save(session, defs)
+        session.commit()
+
+        created = saves_route.create_save(
+            SaveCreate(
+                name="钳制档",
+                settings={
+                    "advance": {"max_per_message": 10**9},
+                    "calendar": {"month": 99},
+                },
+            ),
+            session=session,
+        )
+        row = session.get(Save, created["id"])
+        self.assertEqual(row.settings["advance"]["max_per_message"], 1440)
+        self.assertEqual(row.settings["advance"]["default_minutes"], 10)
+        self.assertEqual(row.settings["calendar"]["month"], 12)
+
+        save_settle_lock(created["id"])
+        self.assertIn(created["id"], helpers._save_locks)
+        saves_route.delete_save(created["id"], session=session)
+        self.assertNotIn(created["id"], helpers._save_locks)
+
+    def test_import_backup_sanitizes_settings(self):
+        session = self._session()
+        defs = self._defs(session)
+        self._save(session, defs)
+        session.commit()
+
+        payload = {
+            "format": backup_route.BACKUP_FORMAT,
+            "version": backup_route.BACKUP_VERSION,
+            "save": {
+                "name": "越界档",
+                "settings": {
+                    "advance": {"max_per_message": -5},
+                    "calendar": {"hour": 77},
+                    "content_prompt": {"bad": 1},
+                },
+            },
+        }
+        imported = backup_route.import_backup(session, payload)
+        session.commit()
+        self.assertEqual(imported.settings["advance"]["max_per_message"], 1)
+        self.assertEqual(imported.settings["calendar"]["hour"], 23)
+        self.assertEqual(imported.settings["content_prompt"], "")
+
+    def test_catalog_provider_and_model_crud(self):
+        session = self._session()
+        defs = self._defs(session)
+        save, _values = self._save(session, defs)
+        session.commit()
+
+        created = catalog_route.create_provider(
+            ProviderIn(
+                slug="demo",
+                display_name="演示",
+                base_url="http://127.0.0.1:1/v1",
+                api_key="sk-x",
+                models=[CatalogModelIn(model_id="m1", display_name="M1")],
+            ),
+            session=session,
+        )
+        self.assertEqual(created["slug"], "demo")
+        self.assertEqual(len(created["models"]), 1)
+
+        model = catalog_route.add_model(
+            created["id"], CatalogModelIn(model_id="m2"), session=session
+        )
+        updated = catalog_route.update_model(
+            created["id"],
+            model["id"],
+            CatalogModelPatch(display_name="M2"),
+            session=session,
+        )
+        self.assertEqual(updated["display_name"], "M2")
+
+        save.model_key = "demo:m1"
+        session.commit()
+        with self.assertRaises(HTTPException) as blocked:
+            catalog_route.delete_model(
+                created["id"], created["models"][0]["id"], session=session
+            )
+        self.assertEqual(blocked.exception.status_code, 409)
+
+        save.model_key = ""
+        session.commit()
+        catalog_route.delete_model(
+            created["id"], created["models"][0]["id"], session=session
+        )
+        catalog_route.delete_provider(created["id"], session=session)
+        self.assertEqual(catalog_route.list_providers(session=session), [])
+
+    def test_character_route_returns_global_character(self):
+        session = self._session()
+        defs = self._defs(session)
+        self._save(session, defs)
+        session.commit()
+
+        data = character_route.get_character(session=session)
+        self.assertEqual(data["name"], "测试角色")
+        self.assertEqual(data["age"], 19)
+
+    def test_chat_stream_error_drops_unreplied_message(self):
+        session = self._session()
+        defs = self._defs(session)
+        self._add_provider(session)
+        save, _values = self._save(session, defs, model_key="testprov:model-a")
+        save_id = save.id
+
+        prepared = chat_route._prepare(save_id, "你好")
+        message_id = prepared["user_message_id"]
+
+        async def fake_stream(**kwargs):
+            raise AIClientError("模型挂了", "request_failed")
+            yield ""  # pragma: no cover
+
+        async def consume():
+            with mock.patch.object(chat_route.ai, "stream_chat", new=fake_stream):
+                gen = chat_route._stream_events(save_id, prepared, BackgroundTasks())
+                return [piece async for piece in gen]
+
+        pieces = asyncio.run(consume())
+        self.assertTrue(any(piece.startswith("event: error") for piece in pieces))
+        session.rollback()
+        self.assertIsNone(session.get(Message, message_id))
 
 
 class ErrorFormatTest(unittest.TestCase):

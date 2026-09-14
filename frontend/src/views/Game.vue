@@ -99,7 +99,7 @@ const themeOpen = ref(false);
 const characterLine = computed(() => {
   const c = game.current?.character;
   if (!c) return "";
-  return `${c.name} · ${c.age} 岁 · ${c.relation}`;
+  return `${c.name} · ${c.age} 岁${c.relation ? ` · ${c.relation}` : ""}`;
 });
 
 async function load(saveId) {

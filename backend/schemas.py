@@ -3,6 +3,8 @@ Pydantic 请求模型 — 仅定义入参；响应用普通 dict 组装。
 """
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -23,7 +25,7 @@ class SaveCreate(BaseModel):
 class SaveUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=128)
     model_key: str | None = Field(default=None, max_length=192)
-    status: str | None = Field(default=None, max_length=16)
+    status: Literal["active", "archived"] | None = None
     settings: dict | None = None
 
     @field_validator("name")

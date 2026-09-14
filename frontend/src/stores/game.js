@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 
-import { apiDelete, apiGet, apiPatch, apiPost } from "../api/client";
+import { apiDelete, apiGet, apiPost } from "../api/client";
 
 export const useGameStore = defineStore("game", {
   state: () => ({
@@ -25,10 +25,6 @@ export const useGameStore = defineStore("game", {
     async deleteSave(id) {
       await apiDelete(`/api/saves/${id}`);
       this.saves = this.saves.filter((s) => s.id !== id);
-    },
-    async renameSave(id, patch) {
-      await apiPatch(`/api/saves/${id}`, patch);
-      await this.loadSaves();
     },
     async loadState(id) {
       this.current = await apiGet(`/api/saves/${id}/state`);

@@ -23,6 +23,7 @@ from helpers import (
     get_runtime,
     get_save_character,
     get_save_or_error,
+    sanitize_settings,
 )
 from orm import (
     AttributeValue,
@@ -31,7 +32,6 @@ from orm import (
     Memory,
     Message,
     Save,
-    SaveFlag,
     SceneLog,
 )
 from routes.saves import save_summary
@@ -217,7 +217,7 @@ def import_backup(session: Session, payload: dict, name: str | None = None) -> S
         model_key=model_key,
         game_minutes=max(0, _as_int(raw.get("game_minutes"))),
         last_summarized_message_id=0,
-        settings=raw.get("settings") if isinstance(raw.get("settings"), dict) else {},
+        settings=sanitize_settings(raw.get("settings")),
     )
     session.add(save)
     session.flush()

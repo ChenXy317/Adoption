@@ -17,11 +17,13 @@ from db import get_session
 from game import clock
 from helpers import (
     character_dict,
+    drop_save_lock,
     error,
     get_global_character,
     get_runtime,
     get_save_character,
     get_save_or_error,
+    sanitize_settings,
 )
 from orm import AttributeDef, AttributeValue, Message, Save
 from schemas import SaveCreate, SaveUpdate
@@ -97,7 +99,7 @@ def create_save(req: SaveCreate, session: Session = Depends(get_session)):
         },
     }
     if req.settings:
-        settings.update(req.settings)
+        settings.update(sanitize_settings(req.settings))
     save = Save(
         character_id=character.id,
         name=req.name.strip(),
@@ -133,7 +135,8 @@ def update_save(
     if req.status is not None:
         save.status = req.status.strip()
     if req.settings is not None:
-        save.settings = {**(save.settings or {}), **req.settings}
+        merged = {**(save.settings or {}), **req.settings}
+        save.settings = sanitize_settings(merged, base=save.settings)
     session.commit()
     return save_summary(session, save)
 
@@ -143,4 +146,5 @@ def delete_save(save_id: int, session: Session = Depends(get_session)):
     save = get_save_or_error(session, save_id)
     session.execute(delete(Save).where(Save.id == save.id))
     session.commit()
+    drop_save_lock(save_id)
     return {"ok": True}

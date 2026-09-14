@@ -370,7 +370,7 @@ def _prepare_summary(save_id: int) -> dict | None:
                         EventLog.game_minutes_at >= first_at,
                     )
                     .order_by(EventLog.id)
-                    .limit(50)
+                    .limit(MEMORY_MAX_MESSAGES_PER_JOB)
                 )
             )
             existing = list(

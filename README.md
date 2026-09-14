@@ -91,7 +91,7 @@ cd backend
 .venv\Scripts\python.exe -m unittest discover -s tests
 ```
 
-共 138 项：纯函数单测 + 接口 / 数据库集成测试。集成测试使用独立数据库 `new_idea_test`，自动创建与清理，需本机 MySQL 可用。
+共 143 项：纯函数单测 + 接口 / 数据库集成测试。集成测试使用独立数据库 `new_idea_test`，自动创建与清理，需本机 MySQL 可用。
 
 ## 使用流程
 

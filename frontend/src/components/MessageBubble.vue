@@ -17,9 +17,16 @@ const changeText = computed(() => {
   const attrs = props.message.meta?.attrs;
   if (!attrs || !attrs.length) return "";
   return attrs
-    .map((c) => `${c.name}${c.delta > 0 ? "+" : ""}${c.delta}`)
+    .map((c) => `${c.name}${formatDelta(c.delta)}`)
     .join("、");
 });
+
+function formatDelta(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return String(value ?? "");
+  const rounded = Math.round(num * 10) / 10;
+  return `${rounded > 0 ? "+" : ""}${rounded}`;
+}
 </script>
 
 <style scoped>

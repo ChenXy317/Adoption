@@ -281,122 +281,150 @@ def _settle_in_thread(save_id: int, text: str, tag_raw: str) -> None:
     threading.Thread(target=run, daemon=True).start()
 
 
+def _drop_message(save_id: int, message_id: int) -> None:
+    """删除未得到回复的用户消息，避免生成失败后重发产生重复记录。"""
+    session = SessionLocal()
+    try:
+        row = session.get(Message, message_id)
+        if row is not None and row.save_id == save_id and row.role == "user":
+            session.delete(row)
+            session.commit()
+    except Exception:
+        logger.exception("清理未回复的用户消息失败: save=%s message=%s", save_id, message_id)
+    finally:
+        session.close()
+
+
+def _drop_message_in_thread(save_id: int, message_id: int) -> None:
+    """客户端断开时的兜底清理（不阻塞事件循环）。"""
+
+    def run():
+        _drop_message(save_id, message_id)
+
+    threading.Thread(target=run, daemon=True).start()
+
+
+async def _stream_events(save_id: int, prepared: dict, background: BackgroundTasks):
+    """流式转发 AI 回复，并在流结束后统一结算；失败/中断时回滚未回复的用户消息。"""
+    stripper = StateTagStripper()
+    collected: list[str] = []
+    error_payload = None
+    settle_started = False
+    try:
+        try:
+            async for text in ai.stream_chat(
+                messages=prepared["messages"],
+                model_id=prepared["model_id"],
+                base_url=prepared["base_url"],
+                api_key=prepared["api_key"],
+                max_tokens=prepared["max_tokens"],
+                params=prepared["params"],
+            ):
+                visible = stripper.feed(text)
+                if visible:
+                    collected.append(visible)
+                    yield sse("chunk", {"text": visible})
+        except AIClientError as e:
+            error_payload = {"code": e.error_code, "message": str(e)}
+    except (asyncio.CancelledError, GeneratorExit):
+        if not settle_started:
+            if collected or stripper.tag_found:
+                _settle_in_thread(save_id, "".join(collected), stripper.state_raw)
+            else:
+                _drop_message_in_thread(save_id, prepared["user_message_id"])
+        raise
+
+    tail = stripper.flush()
+    if tail:
+        collected.append(tail)
+        yield sse("chunk", {"text": tail})
+
+    text = "".join(collected)
+    if not text and not stripper.tag_found:
+        await run_in_threadpool(_drop_message, save_id, prepared["user_message_id"])
+        yield sse(
+            "error",
+            error_payload
+            or {"code": "empty_reply", "message": "模型没有返回任何内容"},
+        )
+        return
+    settled = None
+    settle_started = True
+    try:
+        settled = await run_in_threadpool(
+            _settle, save_id, text, stripper.state_raw, error_payload is not None
+        )
+    except SaveGoneError:
+        yield sse(
+            "error",
+            {"code": "save_not_found", "message": "存档不存在或已被删除"},
+        )
+        return
+    if settled["changes"] or settled["mood_label"]:
+        yield sse(
+            "state_update",
+            {
+                "attrs": settled["changes"],
+                "phase": settled["phase"],
+                "tendency": settled["tendency"],
+                "mood_label": settled["mood_label"],
+                "game_minutes": settled["game_minutes"],
+                "virtual_label": settled["virtual"]["label"],
+            },
+        )
+    if settled["events"] or settled["messages"]:
+        yield sse(
+            "event_triggered",
+            {
+                "events": settled["events"],
+                "messages": settled["messages"],
+            },
+        )
+    if settled["scene"]["entered"] or settled["scene"]["ended"]:
+        yield sse(
+            "scene_update",
+            {
+                "entered": settled["scene"]["entered"],
+                "ended": settled["scene"]["ended"],
+                "active": settled["scene"]["active"],
+            },
+        )
+    yield sse(
+        "time_update",
+        {
+            "advance_minutes": settled["time_advance"],
+            "game_minutes": settled["game_minutes"],
+            "virtual_label": settled["virtual"]["label"],
+            "virtual": settled["virtual"],
+        },
+    )
+    if settled.get("memory_due"):
+        background.add_task(memory.safe_run_summary, save_id)
+    if error_payload is not None:
+        yield sse("error", error_payload)
+    else:
+        yield sse(
+            "done",
+            {
+                "message_id": settled["message_id"],
+                "meta": {
+                    "attrs": settled["ai_changes"],
+                    "time_advance": settled["time_advance"],
+                },
+                "game_minutes": settled["game_minutes"],
+                "virtual_label": settled["virtual"]["label"],
+            },
+        )
+
+
 @router.post("/api/saves/{save_id}/chat")
 async def chat(save_id: int, req: ChatIn, background: BackgroundTasks):
     message = req.message.strip()
     if not message:
         error("empty_message", "消息不能为空", 400)
     prepared = await run_in_threadpool(_prepare, save_id, message)
-
-    async def event_gen():
-        stripper = StateTagStripper()
-        collected: list[str] = []
-        error_payload = None
-        settle_started = False
-        try:
-            try:
-                async for text in ai.stream_chat(
-                    messages=prepared["messages"],
-                    model_id=prepared["model_id"],
-                    base_url=prepared["base_url"],
-                    api_key=prepared["api_key"],
-                    max_tokens=prepared["max_tokens"],
-                    params=prepared["params"],
-                ):
-                    visible = stripper.feed(text)
-                    if visible:
-                        collected.append(visible)
-                        yield sse("chunk", {"text": visible})
-            except AIClientError as e:
-                error_payload = {"code": e.error_code, "message": str(e)}
-        except (asyncio.CancelledError, GeneratorExit):
-            if not settle_started and (collected or stripper.tag_found):
-                _settle_in_thread(save_id, "".join(collected), stripper.state_raw)
-            raise
-
-        tail = stripper.flush()
-        if tail:
-            collected.append(tail)
-            yield sse("chunk", {"text": tail})
-
-        text = "".join(collected)
-        if not text and not stripper.tag_found:
-            yield sse(
-                "error",
-                error_payload
-                or {"code": "empty_reply", "message": "模型没有返回任何内容"},
-            )
-            return
-        settled = None
-        settle_started = True
-        try:
-            settled = await run_in_threadpool(
-                _settle, save_id, text, stripper.state_raw, error_payload is not None
-            )
-        except SaveGoneError:
-            yield sse(
-                "error",
-                {"code": "save_not_found", "message": "存档不存在或已被删除"},
-            )
-            return
-        if settled["changes"] or settled["mood_label"]:
-            yield sse(
-                "state_update",
-                {
-                    "attrs": settled["changes"],
-                    "phase": settled["phase"],
-                    "tendency": settled["tendency"],
-                    "mood_label": settled["mood_label"],
-                    "game_minutes": settled["game_minutes"],
-                    "virtual_label": settled["virtual"]["label"],
-                },
-            )
-        if settled["events"] or settled["messages"]:
-            yield sse(
-                "event_triggered",
-                {
-                    "events": settled["events"],
-                    "messages": settled["messages"],
-                },
-            )
-        if settled["scene"]["entered"] or settled["scene"]["ended"]:
-            yield sse(
-                "scene_update",
-                {
-                    "entered": settled["scene"]["entered"],
-                    "ended": settled["scene"]["ended"],
-                    "active": settled["scene"]["active"],
-                },
-            )
-        yield sse(
-            "time_update",
-            {
-                "advance_minutes": settled["time_advance"],
-                "game_minutes": settled["game_minutes"],
-                "virtual_label": settled["virtual"]["label"],
-                "virtual": settled["virtual"],
-            },
-        )
-        if settled.get("memory_due"):
-            background.add_task(memory.safe_run_summary, save_id)
-        if error_payload is not None:
-            yield sse("error", error_payload)
-        else:
-            yield sse(
-                "done",
-                {
-                    "message_id": settled["message_id"],
-                    "meta": {
-                        "attrs": settled["ai_changes"],
-                        "time_advance": settled["time_advance"],
-                    },
-                    "game_minutes": settled["game_minutes"],
-                    "virtual_label": settled["virtual"]["label"],
-                },
-            )
-
     return StreamingResponse(
-        event_gen(),
+        _stream_events(save_id, prepared, background),
         media_type="text/event-stream",
         headers=SSE_HEADERS,
         background=background,

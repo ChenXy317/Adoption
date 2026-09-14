@@ -66,6 +66,11 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if APP_HOST not in ("127.0.0.1", "localhost", "::1"):
+        logger.warning(
+            "APP_HOST=%s 不是本机回环地址：服务无登录鉴权，请勿暴露到不受信任的网络",
+            APP_HOST,
+        )
     init_db()
     session = SessionLocal()
     try:

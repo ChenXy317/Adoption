@@ -259,8 +259,14 @@ def set_flag(session: Session, save_id: int, key: str, value) -> None:
 
 
 AI_FLAG_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
-_AI_FLAG_RESERVED = {"active_scene", "random_rolls", "neglect", "mood_label"}
 MOOD_LABEL_AT_FLAG = "mood_label_at"
+_AI_FLAG_RESERVED = {
+    "active_scene",
+    "random_rolls",
+    "neglect",
+    "mood_label",
+    MOOD_LABEL_AT_FLAG,
+}
 
 
 def set_mood_label(session: Session, save_id: int, label: str, at_abs: int) -> None:
@@ -722,7 +728,7 @@ def settle_time(
     pending_days: list[int] = []
     forced_scene: str | None = None
 
-    delta, ticks, crossed = _advance_core(
+    _delta, ticks, crossed = _advance_core(
         session, save, defs_map, values, target_game_minutes
     )
     tick_changes.extend(ticks)
@@ -840,7 +846,6 @@ def settle_time(
         if entry and entry.get("message")
     ]
     return {
-        "delta": delta,
         "tick_changes": tick_changes,
         "ordered_changes": ordered_changes,
         "triggered": triggered_results,
