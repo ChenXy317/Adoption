@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
@@ -15,19 +16,32 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from ai_client import ai
-from config import ALLOWED_ORIGINS, APP_HOST, APP_PORT, FRONTEND_DIR
+from config import ALLOWED_ORIGINS, APP_HOST, APP_PORT, BASE_DIR, FRONTEND_DIR
 from db import SessionLocal, init_db
 from routes.catalog import router as catalog_router
+from routes.character import router as character_router
 from routes.chat import router as chat_router
 from routes.defs import router as defs_router
 from routes.saves import router as saves_router
 from routes.state import router as state_router
-from seeds.loader import apply_seeds
+from seeds.loader import apply_character_seed, apply_seeds
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-)
+def _setup_logging() -> None:
+    """日志始终写文件；有控制台（非 pythonw）时同时输出到 stderr。"""
+    handlers: list[logging.Handler] = [
+        logging.FileHandler(BASE_DIR / "server.log", encoding="utf-8")
+    ]
+    if sys.stderr is not None:
+        handlers.append(logging.StreamHandler(sys.stderr))
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        handlers=handlers,
+        force=True,
+    )
+
+
+_setup_logging()
 logger = logging.getLogger(__name__)
 
 
@@ -37,6 +51,7 @@ async def lifespan(app: FastAPI):
     session = SessionLocal()
     try:
         apply_seeds(session)
+        apply_character_seed(session)
     finally:
         session.close()
     logger.info("服务初始化完成")
@@ -55,6 +70,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(character_router)
 app.include_router(saves_router)
 app.include_router(chat_router)
 app.include_router(state_router)
@@ -119,4 +135,10 @@ if __name__ == "__main__":
         "true",
         "yes",
     )
-    uvicorn.run("main:app", host=APP_HOST, port=APP_PORT, reload=reload_enabled)
+    uvicorn.run(
+        "main:app",
+        host=APP_HOST,
+        port=APP_PORT,
+        reload=reload_enabled,
+        log_config=None,
+    )

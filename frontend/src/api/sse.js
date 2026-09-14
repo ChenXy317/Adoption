@@ -44,22 +44,26 @@ export async function streamChat(saveId, message, handlers = {}, signal) {
     dataLines = [];
   };
 
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    let index;
-    while ((index = buffer.indexOf("\n")) >= 0) {
-      const line = buffer.slice(0, index).replace(/\r$/, "");
-      buffer = buffer.slice(index + 1);
-      if (line === "") {
-        dispatch();
-      } else if (line.startsWith("event: ")) {
-        eventName = line.slice(7).trim();
-      } else if (line.startsWith("data: ")) {
-        dataLines.push(line.slice(6));
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let index;
+      while ((index = buffer.indexOf("\n")) >= 0) {
+        const line = buffer.slice(0, index).replace(/\r$/, "");
+        buffer = buffer.slice(index + 1);
+        if (line === "") {
+          dispatch();
+        } else if (line.startsWith("event: ")) {
+          eventName = line.slice(7).trim();
+        } else if (line.startsWith("data: ")) {
+          dataLines.push(line.slice(6));
+        }
       }
     }
+  } finally {
+    reader.releaseLock();
   }
   dispatch();
 }

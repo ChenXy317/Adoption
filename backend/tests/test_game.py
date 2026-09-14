@@ -1,10 +1,11 @@
-"""game/ 纯函数层最小单元测试：时钟换算、条件边界、标签解析、属性钳制。"""
+"""game/ 纯函数层最小单元测试：时钟换算、条件边界、标签解析、属性钳制、设定书注入。"""
 import unittest
 
 from game import clock
-from game.attributes import apply_deltas, clamp, phase_of
+from game.attributes import apply_deltas, clamp, phase_key_of, phase_of
+from game.prompt import _persona_block, _sample_lines_block, _stage_note
 from game.tags import StateTagStripper, parse_state
-from orm import AttributeDef
+from orm import AttributeDef, Character
 
 
 def make_def(key, name="属性", lo=0, hi=100, default=0, ai_editable=True):
@@ -137,6 +138,54 @@ class TagsTest(unittest.TestCase):
         out += s.flush()
         self.assertEqual(out, "正文")
         self.assertFalse(s.tag_found)
+
+
+class PhaseTest(unittest.TestCase):
+    def test_phase_key_of(self):
+        self.assertEqual(
+            phase_key_of({"affection": 0, "trust": 0, "dependence": 0}),
+            ("stranger", "陌生"),
+        )
+        self.assertEqual(
+            phase_key_of({"affection": 95, "trust": 95, "dependence": 95})[0],
+            "attached",
+        )
+
+
+class PromptTest(unittest.TestCase):
+    def make_character(self):
+        return Character(
+            name="小雅",
+            age=22,
+            relation="邻居",
+            persona={
+                "appearance": "长发，左眼下有颗小痣",
+                "tags": ["温柔", "好奇"],
+                "stages": {"close": "她开始主动靠近你，语气亲昵。"},
+                "sample_lines": ["……嗯。", "今天也超有精神！"],
+            },
+            freeform="",
+        )
+
+    def test_persona_block_deep_fields(self):
+        text = _persona_block(self.make_character())
+        self.assertIn("外貌：长发，左眼下有颗小痣", text)
+        self.assertIn("性格标签：温柔、好奇", text)
+        self.assertNotIn("补充设定", text)
+
+    def test_stage_note_uses_character_stage(self):
+        note = _stage_note(self.make_character(), "close", "亲近")
+        self.assertIn("亲近", note)
+        self.assertIn("她开始主动靠近你", note)
+
+    def test_stage_note_falls_back_to_default(self):
+        note = _stage_note(self.make_character(), "stranger", "陌生")
+        self.assertIn("戒备", note)
+
+    def test_sample_lines(self):
+        block = _sample_lines_block(self.make_character())
+        self.assertIn("……嗯。", block)
+        self.assertIn("不要照抄", block)
 
 
 if __name__ == "__main__":

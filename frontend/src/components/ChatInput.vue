@@ -5,7 +5,7 @@
       rows="3"
       placeholder="说点什么…（Enter 发送，Shift+Enter 换行）"
       :disabled="chat.streaming"
-      @keydown.enter.exact.prevent="send"
+      @keydown.enter.exact.prevent="onEnter"
     ></textarea>
     <button
       class="btn primary"
@@ -33,7 +33,13 @@ async function send() {
   const content = text.value.trim();
   if (!content || chat.streaming) return;
   text.value = "";
-  await chat.send(props.saveId, content);
+  const ok = await chat.send(props.saveId, content);
+  if (!ok && !text.value) text.value = content;
+}
+
+function onEnter(event) {
+  if (event.isComposing) return;
+  send();
 }
 </script>
 

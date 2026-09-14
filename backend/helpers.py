@@ -143,13 +143,19 @@ def character_dict(character: Character | None) -> dict | None:
     if character is None:
         return None
     return {
+        "id": character.id,
         "name": character.name,
         "age": character.age,
         "relation": character.relation,
         "persona": character.persona or {},
         "freeform": character.freeform or "",
-        "template_key": character.template_key or "",
+        "updated_at": character.updated_at,
     }
+
+
+def get_global_character(session: Session) -> Character | None:
+    """全局唯一女主角（取最早创建的一条）。"""
+    return session.scalar(select(Character).order_by(Character.id).limit(1))
 
 
 def attribute_items(

@@ -63,15 +63,23 @@ def _validate_key_fields(use_env_key: bool, api_key_env: str) -> str:
     return env_name
 
 
-def _save_refs(session: Session, key_prefix: str) -> list[str]:
-    """引用了该前缀（模型 key 或 slug:）的存档名。"""
+def _referenced_saves(
+    session: Session, key: str, *, match_prefix: bool = False
+) -> list[str]:
+    """引用了该模型 key 的存档名；match_prefix 用于供应商（slug:）级别判断。"""
     names = []
     for save in session.scalars(select(Save)):
-        keys = [save.model_key or ""]
-        memory_model = (save.settings or {}).get("memory_model") or MEMORY_MODEL
-        keys.append(memory_model or "")
-        if any(k and k.startswith(key_prefix) for k in keys):
-            names.append(save.name)
+        keys = [
+            save.model_key or "",
+            (save.settings or {}).get("memory_model") or MEMORY_MODEL or "",
+        ]
+        for candidate in keys:
+            if not candidate:
+                continue
+            hit = candidate.startswith(key) if match_prefix else candidate == key
+            if hit:
+                names.append(save.name)
+                break
     return names
 
 
@@ -154,7 +162,7 @@ def update_provider(
 @router.delete("/api/providers/{provider_id}")
 def delete_provider(provider_id: int, session: Session = Depends(get_session)):
     provider = _require_provider(session, provider_id)
-    refs = _save_refs(session, f"{provider.slug}:")
+    refs = _referenced_saves(session, f"{provider.slug}:", match_prefix=True)
     if refs:
         error("in_use", f"无法删除：仍被存档「{'」「'.join(refs)}」引用", 409)
     session.execute(delete(Provider).where(Provider.id == provider_id))
@@ -209,6 +217,9 @@ def update_model(
     if model_id is not None and not model_id:
         error("empty_model_id", "model-id 不能为空", 400)
     if model_id is not None and model_id != model.model_id:
+        refs = _referenced_saves(session, f"{provider.slug}:{model.model_id}")
+        if refs:
+            error("in_use", f"无法修改 model-id：仍被存档「{'」「'.join(refs)}」引用", 409)
         duplicate = session.scalar(
             select(CatalogModel).where(
                 CatalogModel.provider_id == provider_id,
@@ -236,7 +247,7 @@ def delete_model(
     provider = _require_provider(session, provider_id)
     model = _require_model(session, provider_id, model_row_id)
     key = f"{provider.slug}:{model.model_id}"
-    refs = _save_refs(session, f"{key}")
+    refs = _referenced_saves(session, key)
     if refs:
         error("in_use", f"无法删除：仍被存档「{'」「'.join(refs)}」引用", 409)
     session.execute(delete(CatalogModel).where(CatalogModel.id == model.id))

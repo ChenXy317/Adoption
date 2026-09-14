@@ -7,6 +7,7 @@ import { useGameStore } from "./game";
 import { useUiStore } from "./ui";
 
 let localId = -1;
+let activeController = null;
 
 export const useChatStore = defineStore("chat", {
   state: () => ({
@@ -19,9 +20,16 @@ export const useChatStore = defineStore("chat", {
       const data = await apiGet(`/api/saves/${saveId}/messages?limit=200`);
       this.messages = data.messages;
     },
+    cancel() {
+      if (activeController) activeController.abort();
+    },
+    _dropMessage(message) {
+      const index = this.messages.indexOf(message);
+      if (index >= 0) this.messages.splice(index, 1);
+    },
     async send(saveId, text) {
       const content = text.trim();
-      if (!content || this.streaming) return;
+      if (!content || this.streaming) return true;
       const game = useGameStore();
       const ui = useUiStore();
       this.error = "";
@@ -40,34 +48,57 @@ export const useChatStore = defineStore("chat", {
       });
       this.messages.push(assistant);
       this.streaming = true;
+      const controller = new AbortController();
+      activeController = controller;
+      let settled = false;
+      let failed = false;
+      let hadText = false;
       try {
-        await streamChat(saveId, content, {
-          chunk: (data) => {
-            assistant.content += data.text;
+        await streamChat(
+          saveId,
+          content,
+          {
+            chunk: (data) => {
+              assistant.content += data.text;
+            },
+            state_update: (data) => {
+              game.applyAttrs(data.attrs, data.phase);
+            },
+            time_update: (data) => {
+              game.applyTime(data);
+            },
+            done: (data) => {
+              settled = true;
+              if (data.message_id == null) {
+                this._dropMessage(assistant);
+              } else {
+                assistant.id = data.message_id;
+                assistant.meta = data.meta || {};
+                assistant.streaming = false;
+              }
+            },
+            error: (data) => {
+              failed = true;
+              this.error = data.message;
+              ui.toast("error", data.message);
+            },
           },
-          state_update: (data) => {
-            game.applyAttrs(data.attrs);
-          },
-          time_update: (data) => {
-            game.applyTime(data.virtual_label, data.game_minutes);
-          },
-          done: (data) => {
-            assistant.id = data.message_id;
-            assistant.meta = data.meta || {};
-            assistant.streaming = false;
-          },
-          error: (data) => {
-            this.error = data.message;
-            ui.toast("error", data.message);
-          },
-        });
+          controller.signal
+        );
       } catch (e) {
-        this.error = e.message;
-        ui.toast("error", e.message);
+        failed = true;
+        if (e.name !== "AbortError") {
+          this.error = e.message;
+          ui.toast("error", e.message);
+        }
       } finally {
+        if (activeController === controller) activeController = null;
         assistant.streaming = false;
         this.streaming = false;
+        hadText = Boolean(assistant.content.trim());
+        if (failed && !hadText) this._dropMessage(assistant);
       }
+      return settled || hadText;
     },
   },
 });

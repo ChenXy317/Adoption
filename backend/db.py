@@ -23,6 +23,11 @@ from config import (
 
 logger = logging.getLogger(__name__)
 
+if not MYSQL_PASSWORD or not MYSQL_PASSWORD.strip():
+    raise RuntimeError(
+        "MYSQL_PASSWORD 环境变量未设置或为空！请在系统环境变量或项目根 .env 中设置。"
+    )
+
 
 class Base(DeclarativeBase):
     pass
@@ -65,12 +70,98 @@ def ensure_database() -> None:
         conn.close()
 
 
+def _migrate_character_global() -> None:
+    """旧库迁移：characters 由「每档一角色」改为全局唯一女主角设定书。"""
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(engine)
+    tables = inspector.get_table_names()
+    if "characters" not in tables:
+        return
+    char_columns = {c["name"] for c in inspector.get_columns("characters")}
+    if "save_id" not in char_columns:
+        return
+
+    logger.info("检测到旧版 characters 结构，开始迁移为全局女主角")
+    if "characters_legacy" in tables:
+        with engine.begin() as conn:
+            conn.execute(text("DROP TABLE characters_legacy"))
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE characters RENAME TO characters_legacy"))
+        save_columns = {c["name"] for c in inspect(engine).get_columns("saves")}
+        if "character_id" not in save_columns:
+            conn.execute(text("ALTER TABLE saves ADD COLUMN character_id INT NULL"))
+
+    import orm
+
+    orm.Character.__table__.create(engine)
+
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO characters "
+                "(name, age, relation, persona, freeform, created_at, updated_at) "
+                "SELECT name, age, relation, persona, freeform, created_at, updated_at "
+                "FROM characters_legacy ORDER BY updated_at DESC, id DESC LIMIT 1"
+            )
+        )
+        new_id = conn.execute(
+            text("SELECT id FROM characters ORDER BY id LIMIT 1")
+        ).scalar()
+        conn.execute(
+            text("UPDATE saves SET character_id = :cid"), {"cid": new_id}
+        )
+        fk_exists = conn.execute(
+            text(
+                "SELECT COUNT(*) FROM information_schema.KEY_COLUMN_USAGE "
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'saves' "
+                "AND COLUMN_NAME = 'character_id' "
+                "AND REFERENCED_TABLE_NAME = 'characters'"
+            )
+        ).scalar()
+        if not fk_exists:
+            conn.execute(
+                text(
+                    "ALTER TABLE saves ADD CONSTRAINT fk_saves_character "
+                    "FOREIGN KEY (character_id) REFERENCES characters(id) "
+                    "ON DELETE SET NULL"
+                )
+            )
+        conn.execute(text("DROP TABLE characters_legacy"))
+    logger.info("characters 迁移完成（全局角色 id=%s）", new_id)
+
+
+def _migrate_attribute_double() -> None:
+    """属性数值由 FLOAT 升级为 DOUBLE，避免大数值精度丢失。"""
+    from sqlalchemy import text
+
+    with engine.begin() as conn:
+        rows = conn.execute(
+            text(
+                "SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS "
+                "WHERE TABLE_SCHEMA = DATABASE() "
+                "AND TABLE_NAME IN ('attribute_defs', 'attribute_values') "
+                "AND DATA_TYPE = 'float'"
+            )
+        ).fetchall()
+        for table, column in rows:
+            conn.execute(
+                text(
+                    f"ALTER TABLE `{table}` MODIFY COLUMN `{column}` "
+                    "DOUBLE NOT NULL"
+                )
+            )
+            logger.info("已升级 %s.%s 为 DOUBLE", table, column)
+
+
 def init_db() -> None:
-    """建库 + 建表（幂等）。"""
+    """建库 + 建表 + 结构迁移（幂等）。"""
     ensure_database()
     import orm  # noqa: F401  确保模型已注册到 Base.metadata
 
     Base.metadata.create_all(engine)
+    _migrate_character_global()
+    _migrate_attribute_double()
     logger.info("数据库 %s 初始化完成", MYSQL_DATABASE)
 
 

@@ -18,6 +18,7 @@ from game import clock
 from helpers import (
     character_dict,
     error,
+    get_global_character,
     get_runtime,
     get_save_or_error,
 )
@@ -28,7 +29,11 @@ router = APIRouter(tags=["saves"])
 
 
 def save_summary(session: Session, save: Save, message_count: int | None = None) -> dict:
-    character = session.scalar(select(Character).where(Character.save_id == save.id))
+    character = (
+        session.get(Character, save.character_id)
+        if save.character_id
+        else None
+    )
     if message_count is None:
         message_count = session.scalar(
             select(func.count(Message.id)).where(Message.save_id == save.id)
@@ -76,8 +81,13 @@ def list_saves(session: Session = Depends(get_session)):
 
 @router.post("/api/saves")
 def create_save(req: SaveCreate, session: Session = Depends(get_session)):
-    if req.character is None:
-        error("character_required", "创建存档需要角色设定", 400)
+    character = get_global_character(session)
+    if character is None:
+        error(
+            "character_required",
+            "还没有女主角设定书，请先在首页创建女主角",
+            400,
+        )
     if req.model_key:
         get_runtime(session, req.model_key)
     settings = {
@@ -92,24 +102,13 @@ def create_save(req: SaveCreate, session: Session = Depends(get_session)):
     if req.settings:
         settings.update(req.settings)
     save = Save(
+        character_id=character.id,
         name=req.name.strip(),
         model_key=req.model_key,
         settings=settings,
     )
     session.add(save)
     session.flush()
-    ch = req.character
-    session.add(
-        Character(
-            save_id=save.id,
-            name=ch.name.strip(),
-            age=ch.age,
-            relation=ch.relation.strip(),
-            persona=ch.persona or {},
-            freeform=ch.freeform or "",
-            template_key=ch.template_key or "",
-        )
-    )
     init_attribute_values(session, save.id)
     session.commit()
     return save_summary(session, save)

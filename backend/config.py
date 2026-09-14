@@ -42,10 +42,6 @@ except (ValueError, TypeError):
     raise RuntimeError("MYSQL_PORT 环境变量值无效，应为整数端口号")
 MYSQL_USER = os.environ.get("MYSQL_USER", "root")
 MYSQL_PASSWORD = os.environ.get("MYSQL_PASSWORD")
-if not MYSQL_PASSWORD or not MYSQL_PASSWORD.strip():
-    raise RuntimeError(
-        "MYSQL_PASSWORD 环境变量未设置或为空！请在系统环境变量或项目根 .env 中设置。"
-    )
 MYSQL_DATABASE = os.environ.get("MYSQL_DATABASE", "new_idea")
 MYSQL_CHARSET = "utf8mb4"
 

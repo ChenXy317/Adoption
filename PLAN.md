@@ -1,10 +1,11 @@
 # 计划：网页版 AI 养成游戏（个人向）
 
-> 纯网页端、AI 驱动的文字养成游戏。个人自用，不发布；成人向（R18），角色设定必须为明确成年。
+> 纯网页端、AI 驱动的文字养成游戏。个人自用，不发布；内容不做分级限制（默认无限制），角色设定为明确成年。
 > 核心循环：**对话/互动 → 属性变化 → 事件触发 → 性格演化 → 新对话与新事件**
 > 时间与现实完全隔离：纯虚拟时钟，由对话/行动推进；经济系统（金钱/打工/消费）作为互动燃料。
+> **定位：单女主、深刻画的 galgame 式体验（方向参考 Teaching Feeling）。女主角全局唯一（跨存档共享设定书）；存档 = 从头来过的周目。核心日常循环：照顾/陪伴互动 → 状态与关系渐变（警戒降、信任升）→ 时间推进 → 阶段解锁新互动与特殊事件。优先角色刻画深度，分支/日程等玩法后置。**
 
-- 状态：计划已定稿（含虚拟时间、经济系统、模型配置修订），尚未开工（M1 待启动）
+- 状态：M1 骨架、M2 女主角刻画已完成（含设定书全局化迁移）；M3 事件与时间待启动
 - 项目目录：`D:\Projects\New Idea`（代码直接建于此目录；本文档为唯一真相源）
 - 本文档随决策更新
 
@@ -12,9 +13,9 @@
 
 ## 1. 范围
 
-**本期做**：角色设定、属性、事件、虚拟时间、对话引擎、记忆系统（底层骨架）、经济与行动。
-**本期不做**：Live2D、TTS 语音、小游戏、换装、体力系统、发布合规（个人自用）。
-**边界**：成人内容由「内容分级开关 + 用户自写提示词模板」承载，引擎不内置露骨文本；角色为明确成年设计。
+**本期做**：单女主角色设定书（深度刻画）、属性、事件、虚拟时间、对话引擎、记忆系统（底层骨架）、日常互动行动（含经济）。
+**本期不做**：Live2D、TTS 语音、小游戏、换装（外观仅文字描述）、体力/健康/伤病机制、多角色阵容、发布合规（个人自用）。
+**边界**：内容默认无限制（个人自用），可选的内容风格指令由用户自写；角色为明确成年设计。
 
 ## 2. 技术栈
 
@@ -49,11 +50,11 @@ FastAPI
 
 | 表 | 关键字段 | 说明 |
 |---|---|---|
-| `saves` | id, name, status, model_key, game_minutes, last_summarized_message_id, settings JSON | 存档；model_key 为目录模型引用（`slug:model_id`）；game_minutes 为虚拟时钟（累计分钟）；settings 存日历、推进、冷落、生成参数 |
-| `characters` | id, save_id(1:1, UNIQUE), name, age, relation, persona JSON, freeform, template_key | 角色设定；age 后端校验 ≥18 |
+| `saves` | id, character_id(FK), name, status, model_key, game_minutes, last_summarized_message_id, settings JSON | 周目存档；model_key 为目录模型引用（`slug:model_id`）；game_minutes 为虚拟时钟（累计分钟）；settings 存日历、推进、冷落、生成参数 |
+| `characters` | id, name, age, relation, persona JSON, freeform | 女主角设定书（全局唯一，跨存档共享）；age 后端校验 ≥18 |
 | `attribute_defs` | id, key, name, category, min, max, default_value, tick_rule JSON, ai_editable, sort, enabled | 属性定义；ai_editable=false 时禁止 AI 在状态标签改动（如金钱）；key 创建后不可改（仅启停），避免孤儿属性值 |
 | `attribute_values` | save_id, attr_key, value, updated_at | 每存档属性值（联合主键） |
-| `event_defs` | id, key, name, category, trigger JSON, cost JSON, effects JSON, prompt_template, once, cooldown_minutes, priority, enabled | 事件定义；manual 类型配 cost 供手动触发 |
+| `event_defs` | id, key, name, category, trigger JSON, cost JSON, effects JSON, prompt_template, once, cooldown_minutes, priority, enabled | 事件定义；category 三类：random / fixed / manual；manual 配 cost 供手动触发 |
 | `event_logs` | id, save_id, event_id, status, content, meta JSON, game_minutes_at, triggered_at | 事件历史；记录触发时虚拟时刻与收支 |
 | `scene_defs` | id, key, name, category, enter_trigger JSON, enter_cost JSON, scene_prompt, goal, min_turns, max_turns, exit JSON, effects JSON, next_scenes JSON, once, cooldown_minutes, priority, enabled | 多轮场景定义；进入/结束条件复用事件条件求值器 |
 | `scene_logs` | id, save_id, scene_key, status(started/finished/aborted), summary, meta JSON, game_minutes_at, started_at, finished_at | 场景历史；结束写总结与结算 |
@@ -64,26 +65,36 @@ FastAPI
 | `providers` | id, slug(创建后不可改), display_name, base_url, api_key, use_env_key, api_key_env, sort_order | 供应商（照 Nehchat）；slug 为模型 key 前缀；密钥双模式（存库/环境变量） |
 | `catalog_models` | id, provider_id(FK 级联删除), model_id, display_name, UNIQUE(provider_id, model_id) | 目录模型；引用一律用 `slug:model_id` |
 
-**默认属性种子**：好感度、信任、心情、体力、亲密、依赖、警戒、金钱(money)。
+**默认属性种子**：好感度、信任、心情、亲密、依赖、警戒、金钱(money)。
+
+**属性原则**：只做通用数值属性，不建体力/健康/伤病等身体状态机制；属性定义由种子/管理接口维护（界面不暴露编辑，属性值正常展示），由状态标签、时间 tick、事件/行动效果修改。
 
 ## 5. 核心系统
 
-### 5.1 角色设定
+### 5.1 女主角设定书（单女主，内置内容）
 
-- 创建向导：名字 → 年龄（≥18 校验）→ 关系 → 性格模板（预设均为成年向：温柔年上 / 同龄傲娇 / 元气邻家 / 慢热敏感）→ 自由补充
-- `persona` 结构化：性格标签、说话风格、喜好/厌恶、口头禅、背景故事；模板可另存
+- **定位**：全局唯一女主角，完全设计好的内置内容，不在游戏界面暴露编辑；存档是从头开始的周目，开局即按设定书展开这段关系的重演
+- **真相源**：`seeds/character.json`，启动时装载（以种子为准覆盖库中记录）；修改设定 = 改种子文件后重启
+- **深度字段**：基本信息（名字/年龄/称呼玩家的方式）、外貌描述（含日常穿着文字描述）、性格（多维度）、说话风格（语气/句长/口癖/常用词/禁用词）、喜好/厌恶、背景故事、与玩家的关系史、日常（作息/职业/兴趣）、秘密与敏感点、阶段变化（陌生→熟悉→亲近→依恋 各自的行为与语气描述）、参考台词（few-shot 示例，3–10 条）
+- **注入**：按当前关系阶段选取对应描述注入 prompt；参考台词作为 few-shot 附在系统提示后
+- 外观与穿着不做换装系统，以设定书 + AI 文字描述承载
 
 ### 5.2 属性系统
 
 - `tick_rule` 模式：`decay`（衰减）/ `recover`（恢复）/ `regress`（回归中值），按**游戏小时**结算（仅在时间推进时）
 - 金钱（money）：resource 类，min 0，无 tick，ai_editable=false
-- 体力：保留为普通属性，暂无机制用途（体力系统暂缓，见待定）
 - 冷落规则：按虚拟时间重定义，见 5.4
 - 变化来源：AI 状态标签（钳制到 min/max + 单轮变化上限）、时间推进 tick、事件/动作效果
 
 ### 5.3 事件与场景系统
 
-- 五类：`scheduled`（时段/日期）、`conditional`（属性/flag 阈值）、`random`（概率+冷却）、`chain`（flag 解锁剧情链）、`manual`（手动触发，带 cost）
+- **内容原则**：角色固定后，事件/场景像 galgame 一样针对内置女主角专门设计（贴合其背景、性格与关系阶段），由种子维护；触发条件用属性阈值表达阶段门槛，剧情链用 flag 串联
+- **三类事件**：
+  - `random` 随机事件：每个游戏日开始时做一次判定（每日一次，判定结果记入 `save_flags` 防重复），命中后在当天注入；参数含每日概率、冷却、once、可选的时段/属性门槛
+  - `fixed` 固定事件：属性/flag 达到阈值即触发（阶段解锁、剧情链节点）；纯条件判定，不含概率
+  - `manual` 手动事件：行动菜单直接选择（主动交互），带 cost、条件校验与效果
+- 剧情链不单设类型：由固定事件的 flag 条件串联（前序事件写 flag，后续事件以 flag 为门槛）
+- 触发条件 JSON 对三类通用（`period`/`date`/`game_day`/`attr`/`flag` 等）；时段/日期/节日作为条件而非独立类型
 - 触发条件 JSON 示例：
 
 ```json
@@ -96,7 +107,7 @@ FastAPI
 
 - 效果 JSON：`{"attrs":{"mood":10,"money":-80},"advance_minutes":180,"flags":{"unlocked_movie":true},"unlock_events":["movie_night"]}`
 - cost JSON（manual 专用）：`{"money":80,"time_minutes":180}`
-- 时机：每次交互后 + 时间推进结算时 + 手动触发；离线世界静止，无需页面加载评估
+- 时机：每次交互后 + 时间推进结算时（含跨日随机判定）+ 手动触发；离线世界静止，无需页面加载评估
 - manual 事件：点击 → 校验条件与余额 → 扣 cost → 注入场景 prompt 由 AI 叙述，落 `event_logs` 与消息
 - 管理界面：事件/场景定义 CRUD + 启停 + 调试手动触发
 
@@ -135,7 +146,7 @@ FastAPI
 
 ### 5.5 对话引擎（SSE）
 
-- **Prompt 组装顺序**：系统规则 → 角色人设 → 属性+性格阶段 → 虚拟时间/节日 → 当前场景（如有）→ 激活事件情境 → 永久记忆注入 → 内容分级指令（用户模板） → 最近 M 条原文 → 状态标签协议说明
+- **Prompt 组装顺序**：系统规则 → 角色人设 → 属性+性格阶段 → 虚拟时间/节日 → 当前场景（如有）→ 激活事件情境 → 永久记忆注入 → 内容风格指令（可选，用户自写） → 最近 M 条原文 → 状态标签协议说明
 - **状态标签协议**：模型回复末尾输出 `<<<STATE {"attrs":{"affection":2},"mood_label":"开心","flags":{},"time":{"advance_minutes":30},"scene":{"action":"end","summary":"..."}} STATE>>>`（`scene` 仅在场景收尾时出现）；后端流式剥离（仿 `_ThinkStripper`，注意标签可能在末尾且跨 chunk，需 hold-back + 流结束 flush 解析）；应用钳制后的数值与推进量；`scene` 动作交场景结算（受 min_turns 约束）；解析失败静默忽略
 - **落库事务边界**：一次回复的全部写入（assistant 消息 + 属性钳制结果 + 时间推进 + tick + 事件/场景结算）在流结束后同一事务提交；客户端中途断流时保留已生成文本并照常结算（meta 标记 interrupted）
 - **sync ORM 使用规则**：流式阶段不做 DB 写；DB 访问集中在流前（组装上下文）与流后（结算落库）两端，中间不碰库，避免阻塞事件循环；确需中途写时用 run_in_threadpool 包装
@@ -176,14 +187,17 @@ FastAPI
 ### 5.7 性格演化
 
 - 阶段：陌生 → 熟悉 → 亲近 → 依恋；倾向由「依赖/信任比 + 行为计数」推导
-- 每阶段/倾向映射内心状态描述注入 prompt（模板可编辑）
+- 每阶段/倾向的行为与语气描述取自设定书阶段字段，未填写时用通用模板兜底
 
-### 5.8 经济与行动
+### 5.8 行动与互动（含经济）
 
+- **定位**：行动面板是 TF 式日常循环的核心入口——陪伴/照顾/触碰/外出/送礼/打工等互动全部由 `event_defs`（manual 类型 + cost + effects + prompt_template）数据驱动，新增互动只需加数据，无需改代码
 - **金钱**：保留属性 `money`（resource 类；min 0；无 tick；`ai_editable=false`）。AI 可见可提及，但不能在状态标签里改钱；改动只来自动作/事件/调试。初始金额取属性默认值
-- **打工**（暂最简）：确定性动作——消耗虚拟时间（如 4 小时）→ 加钱 → 写一条固定模板的 `event` 消息入库；不耗体力、不走 AI、不耗 token。条目数据驱动（event_defs），将来可加"家教/外卖"等
+- **打工**（暂最简）：确定性动作——消耗虚拟时间（如 4 小时）→ 加钱 → 写一条固定模板的 `event` 消息入库；不走 AI、不耗 token。条目数据驱动（event_defs），将来可加"家教/外卖"等
 - **付费手动事件**：`event_defs` 的 `manual` 类型 + `cost` + `prompt_template`。点击时校验条件与余额 → 扣钱扣时 → 场景注入对话由 AI 叙述；不足则按钮禁用并提示。承载逛街、看电影、吃饭等
 - **送礼**：付费 manual 事件；好感为固定配置值；每个礼物带独立 `prompt_template`，用于触发不同对话/场景
+- **外观与穿着**：无换装系统，穿着以设定书与 AI 文字描述承载
+- **身体状态**：不建体力/健康/伤病机制，一切状态用普通属性表达
 - **记录与展示**：不建独立流水表，收支历史由 `event_logs` 承载；前端右栏加钱包小板块（余额 + 打工入口 + 最近收支）
 
 ### 5.9 模型配置（照 Nehchat 目录设计）
@@ -202,7 +216,7 @@ FastAPI
 
 - 视图：`Home`（存档宫格）、`Game`（主界面）
 - Game 布局：顶栏（虚拟日期·时段·节日·设置·推进入口）｜中央（角色状态卡 + 对话流 + 输入区）｜右栏（属性面板+飘字、钱包板块、行动面板、事件面板）
-- 组件：ChatStream、MessageBubble、StatusBars、SceneBanner（当前场景条：名称/轮数/目标/结束）、WalletPanel、ActionPanel、EventCard、CharacterWizard、AttrDefEditor、EventDefEditor、SceneDefEditor、AdvancePanel（调试）、MemoryPanel、ModelCatalogModal、ThemeModal、Toast
+- 组件：ChatStream、MessageBubble、StatusBars、SceneBanner（当前场景条：名称/轮数/目标/结束）、WalletPanel、ActionPanel（行动菜单：日常互动/送礼/打工）、EventCard、EventDefEditor、SceneDefEditor、AdvancePanel（调试）、MemoryPanel、ModelCatalogModal、ThemeModal、Toast
 - 参考 Nehchat 重写（非直接复制）：`sse.js`、`api.js` 指数退避、主题/弹层/Toast、catalog 交互模式；源码为 vanilla JS + 全局 state，一律按 Vue composable + Pinia 重写
 
 ## 7. API 一览（要点）
@@ -220,7 +234,7 @@ FastAPI
 | CRUD | `/api/attribute-defs`、`/api/event-defs`、`/api/scene-defs` | 定义管理 |
 | GET/POST/PATCH/DELETE | `/api/saves/{id}/memories` | 记忆管理 |
 | POST | `/api/saves/{id}/memories/summarize` | 手动总结 |
-| GET | `/api/character-templates` | 人设模板 |
+| GET | `/api/character` | 女主角设定书（内置内容，只读） |
 | GET/POST | `/api/providers` | 供应商列表 / 新建 |
 | PATCH/DELETE | `/api/providers/{id}` | 编辑 / 删除（被引用时 409） |
 | POST | `/api/providers/{id}/models` | 添加目录模型 |
@@ -237,7 +251,7 @@ New Idea/（= D:\Projects\New Idea）
 │  ├─ main.py config.py db.py orm.py schemas.py ai_client.py
 │  ├─ game/  clock.py attributes.py events.py scene.py prompt.py tags.py memory.py
 │  ├─ routes/ saves.py chat.py state.py events.py scenes.py advance.py defs.py memories.py catalog.py
-│  └─ seeds/ 默认属性·事件·场景·人设模板 JSON
+│  └─ seeds/ 内置女主角·默认属性·事件·场景 JSON
 ├─ frontend/
 │  └─ src/ main.js App.vue stores/ api/ views/ components/ styles/
 ├─ .env  PLAN.md  README.md  快速启动.bat  重置启动.bat
@@ -248,22 +262,27 @@ New Idea/（= D:\Projects\New Idea）
 | 阶段 | 内容 | 验证标准 |
 |---|---|---|
 | M1 骨架 | ORM 建表+种子、存档 CRUD、模型目录（照 5.9）、SSE 对话闭环、Vue 骨架（先用 curl 打通 SSE+落库，再接前端） | 建存档→配目录并连通测试→选模型→流式聊天并落库 |
-| M2 设定与属性 | 角色向导（成年校验）、人设模板、属性定义管理（含 ai_editable）、属性面板实时变化、金钱展示 | 聊天驱动属性变化、重启后保持 |
-| M3 事件与时间 | 虚拟时钟+推进协议（AI/动作/兜底钳制）、虚拟日历/时段/节日、事件引擎（含 manual+cost）、调试推进面板、事件注入对话 | 对话与推进面板均能推动时间并触发时段/日期/阈值事件；AI 推进量被正确钳制 |
+| M2 女主角刻画 | 内置设定书种子（完整设计）+ 启动装载、prompt 深度注入（阶段描述 + 参考台词）、属性定义管理接口、属性面板实时变化 | 改种子即时影响语气与行为；阶段描述随关系切换；聊天驱动属性变化、重启后保持 |
+| M3 事件与时间 | 虚拟时钟+推进协议（AI/动作/兜底钳制）、虚拟日历/时段/节日、三类事件引擎（每日随机判定 / 阈值固定 / 手动+cost）、为女主角设计的事件种子集（阶段化+剧情链）、调试推进面板、事件注入对话 | 对话与推进面板均能推动时间；跨日随机判定每日仅一次；阈值事件与剧情链按设计生效；AI 推进量被正确钳制 |
 | M3.5 多轮场景 | scene_defs 定义、进入/持续/结束/结算全生命周期、STATE 标签扩展、场景 prompt 注入、SceneBanner 与场景定义管理、种子场景 2–3 个 | 触发场景→多轮目标与轮数持续生效→AI/上限自然收尾→结算与场景记忆落库；同时仅一个活跃场景；min_turns 内拒绝提前收尾 |
 | M4 记忆系统 | 总结流水线、记忆管理面板、检索注入 | 达到阈值自动总结；记忆影响后续对话 |
-| M5 行动与经济 | 打工、付费手动事件（逛街/看电影）、送礼（专属对话）、冷落（虚拟时间版）、性格演化、主动消息（推进触发）、事件链 | 打工赚钱→消费送礼→触发专属对话；推进越过时点收到主动消息；互动间隔过大好感下降 |
+| M5 行动与经济 | 行动面板（数据驱动日常互动：陪伴/照顾/外出）、打工、付费手动事件（逛街/看电影）、送礼（专属对话）、冷落（虚拟时间版）、性格演化、主动消息（推进触发）、事件链 | 行动菜单可增条目即生效；打工赚钱→消费送礼→触发专属对话；推进越过时点收到主动消息；互动间隔过大好感下降 |
 | M6 打磨 | 导出备份（建议 M2 后即做轻量导出）、主题、向量检索（可选）、README | 完整备份可恢复 |
 
 ## 10. 已定 / 待定
 
 **已定**：
 
+- 单女主全局唯一设定书（characters 与存档解耦，存档引用 character_id，可从头开新周目）；整体方向参考 Teaching Feeling 的日常照顾循环（互动 → 状态与关系渐变 → 时间推进 → 阶段解锁）；优先角色刻画深度，分支/日程等玩法后置
+- 不做换装（外观仅文字描述）；不建体力/健康/伤病机制，一切状态用通用数值属性表达
+- 设定书与属性定义均为内置内容：游戏界面不暴露编辑（模型配置保留）；设定书真相源为 `seeds/character.json`
+- 内容不做分级限制（默认无限制）；可选的内容风格指令由用户自写，引擎不内置
 - 个人向不发布；无账号单用户；多存档；ORM MySQL；Vue3；无 Redis；纯文本（Live2D/TTS 后置）
 - 时间与现实完全隔离：纯虚拟时钟、行动/AI/事件驱动、离线零行为、AI 未输出时默认推进、冷落按虚拟时间、显示虚拟月日+时段
 - 记忆阈值 20 条 / 30 分钟（30 分钟为技术调度）；检索先做重要性+新近度+关键词
 - 经济：金钱为保留属性且 AI 不可改；打工纯时间换钱（暂不涉体力）；付费手动事件；礼物固定好感+专属对话模板；不建流水表，右栏小板块展示
 - 多轮场景：scene_defs + save_flags.active_scene + scene_logs；每轮注入场景块（含轮数）；结束由 AI 标签 / min-max 轮 / exit 条件判定，min_turns 内拒绝提前收尾；结束同事务结算并生成场景记忆；同时仅一个活跃场景；事件 ⇄ 场景可互相衔接
+- 事件三类：随机（每游戏日开始时一次判定，结果记 save_flags）、固定（属性/flag 阈值触发）、手动（行动菜单主动选择，带 cost）；剧情链用 flag 串联；时段/日期/节日作为条件而非独立类型
 - 模型配置照 Nehchat：providers/catalog_models 两层目录 + `slug:model_id` 引用 + 密钥双模式（存库/环境变量）+ 对外永不回明文 + 删除引用保护 + hello 连通测试；单用户去掉多租户；总结模型同目录可选
 - 工程约定：流结束单事务落库、流式阶段不写 DB、总结任务 save 级互斥、属性 key 不可改（仅启停）、状态标签解析失败留痕 meta
 - 兼容：SQLAlchemy pin ≥2.0.41（支持 Py3.14）；「她的日记」本期不做（对核心循环无贡献，留作将来）
@@ -273,4 +292,3 @@ New Idea/（= D:\Projects\New Idea）
 **待定**：
 
 1. 数值与内容种子：打工时长/收益、事件/礼物清单与价格、冷落参数、推进上限——**M3 结束前必须定稿**，否则 M5 无从调平衡（先按默认 10 分钟 / 上限 180 分钟 / 单跳 24 小时试跑）
-2. 体力系统的将来用途（若引入，最可能挂点：打工门槛、生病事件、恢复节奏）

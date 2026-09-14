@@ -7,6 +7,12 @@ from config import ATTR_MAX_DELTA_PER_MESSAGE
 from orm import AttributeDef
 
 PHASES = ("陌生", "熟悉", "亲近", "依恋")
+PHASE_KEYS = {
+    "陌生": "stranger",
+    "熟悉": "familiar",
+    "亲近": "close",
+    "依恋": "attached",
+}
 
 
 def clamp(value: float, lo: float, hi: float) -> float:
@@ -27,6 +33,12 @@ def phase_of(values: dict[str, float]) -> str:
     if score >= 20:
         return PHASES[1]
     return PHASES[0]
+
+
+def phase_key_of(values: dict[str, float]) -> tuple[str, str]:
+    """返回 (阶段 key, 阶段中文名)。"""
+    label = phase_of(values)
+    return PHASE_KEYS.get(label, "stranger"), label
 
 
 def apply_deltas(

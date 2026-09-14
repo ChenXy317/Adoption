@@ -33,17 +33,6 @@
     "sort": 30
   },
   {
-    "key": "stamina",
-    "name": "体力",
-    "category": "stat",
-    "min": 0,
-    "max": 100,
-    "default_value": 80,
-    "tick_rule": {"mode": "recover", "amount_per_hour": 2},
-    "ai_editable": true,
-    "sort": 40
-  },
-  {
     "key": "intimacy",
     "name": "亲密",
     "category": "stat",

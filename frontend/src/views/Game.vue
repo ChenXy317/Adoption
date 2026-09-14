@@ -21,6 +21,9 @@
         <section class="card panel">
           <h3>状态</h3>
           <div class="dim small" v-if="characterLine">{{ characterLine }}</div>
+          <div class="phase" v-if="game.current?.phase">
+            关系阶段：{{ game.current.phase }}
+          </div>
           <StatusBars :attributes="game.current?.attributes || []" />
         </section>
 
@@ -44,7 +47,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
 import ChatInput from "../components/ChatInput.vue";
@@ -91,13 +94,21 @@ onMounted(async () => {
   }
 });
 
-async function onCatalogClose() {
-  catalogOpen.value = false;
+onBeforeUnmount(() => {
+  chat.cancel();
+});
+
+async function refresh() {
   try {
     await game.loadState(props.id);
   } catch {
     /* 忽略刷新失败 */
   }
+}
+
+async function onCatalogClose() {
+  catalogOpen.value = false;
+  await refresh();
 }
 </script>
 
@@ -165,6 +176,12 @@ async function onCatalogClose() {
   font-weight: 700;
   color: var(--warn);
   margin-bottom: 6px;
+}
+
+.phase {
+  color: var(--accent);
+  font-size: 12px;
+  margin: 4px 0 10px;
 }
 
 .small {

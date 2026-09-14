@@ -16,8 +16,8 @@
 backend/
   main.py config.py db.py orm.py schemas.py helpers.py ai_client.py
   game/     clock.py tags.py attributes.py prompt.py
-  routes/   saves.py chat.py state.py defs.py catalog.py
-  seeds/    默认属性定义与人设模板 JSON
+  routes/   saves.py chat.py state.py defs.py catalog.py character.py
+  seeds/    内置女主角设定书与默认属性定义 JSON
   tests/    game/ 纯函数层单元测试
 frontend/
   src/      views/ components/ stores/ api/ styles/ router/
@@ -68,10 +68,16 @@ cd backend
 ## 使用流程
 
 1. 首页「模型配置」：新建供应商（OpenAI 兼容接口，密钥可存库或读环境变量），添加模型并「测试」连通性。
-2. 「新建存档」：填写角色（年龄校验 ≥18）、选性格模板与对话模型。
-3. 进入游戏：对话驱动属性与虚拟时间；右侧面板实时展示属性、金钱与状态标签解析出的变化。
+2. 「新建存档」：选对话模型并创建周目；所有存档共用同一位女主角，从头开始这段关系。
+3. 进入游戏：对话驱动属性与虚拟时间；右侧面板展示关系阶段、属性与金钱。
+
+## 女主角设定书（内置内容）
+
+- 完全设计好的内置角色，不在游戏界面暴露编辑；真相源为 `backend/seeds/character.json`，启动时自动装载（以种子为准覆盖库中记录）。
+- 修改设定：编辑该 JSON 后重启服务。
+- 深度字段：外貌/穿着/性格/说话风格/喜好/背景/关系史/日常/秘密/四阶段语气/参考台词。
 
 ## 当前进度
 
-- 已完成：M1 骨架（数据模型建表与种子、存档 CRUD、模型目录、SSE 对话闭环、状态标签协议、Vue 基础界面）。
-- 计划中：M2 设定与属性管理、M3 事件与时间、M3.5 多轮场景、M4 记忆、M5 经济与行动、M6 打磨。
+- 已完成：M1 骨架（数据模型建表与种子、存档 CRUD、模型目录、SSE 对话闭环、状态标签协议、Vue 基础界面）；M2 女主角刻画（内置设定书种子与启动装载、prompt 深度注入、属性定义种子与管理接口）。
+- 计划中：M3 事件与时间、M3.5 多轮场景、M4 记忆、M5 行动与经济、M6 打磨。

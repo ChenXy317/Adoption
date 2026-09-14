@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from db import get_session
 from game import clock
+from game.attributes import phase_of
 from helpers import (
     attribute_items,
     character_dict,
@@ -32,8 +33,8 @@ def get_state(save_id: int, session: Session = Depends(get_session)):
         select(AttributeDef).order_by(AttributeDef.sort, AttributeDef.id)
     ).all()
     values = load_attr_values(session, save_id)
-    character = session.scalar(
-        select(Character).where(Character.save_id == save_id)
+    character = (
+        session.get(Character, save.character_id) if save.character_id else None
     )
     active_flag = session.get(SaveFlag, (save_id, "active_scene"))
     return {
@@ -45,6 +46,7 @@ def get_state(save_id: int, session: Session = Depends(get_session)):
             "game_minutes": save.game_minutes,
         },
         "character": character_dict(character),
+        "phase": phase_of(values),
         "virtual": {
             "absolute_minutes": absolute,
             **split,

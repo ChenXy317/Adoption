@@ -19,7 +19,7 @@ from ai_client import AIClientError, ai
 from config import CHAT_HISTORY_MESSAGES, TIME_DEFAULT_ADVANCE, TIME_MAX_ADVANCE_PER_MESSAGE
 from db import SessionLocal
 from game import clock
-from game.attributes import apply_deltas
+from game.attributes import apply_deltas, phase_of
 from game.prompt import build_messages
 from game.tags import StateTagStripper, parse_state
 from helpers import get_runtime, get_save_or_error, load_attr_values
@@ -50,13 +50,15 @@ def _prepare(save_id: int, message: str) -> dict:
 
             error("model_not_set", "该存档尚未选择模型，请先在「模型配置」中选择", 400)
         runtime = get_runtime(session, save.model_key)
-        character = session.scalar(
-            select(Character).where(Character.save_id == save_id)
+        character = (
+            session.get(Character, save.character_id)
+            if save.character_id
+            else None
         )
         if character is None:
             from helpers import error
 
-            error("character_missing", "该存档缺少角色设定", 400)
+            error("character_missing", "该存档未关联女主角设定书", 400)
         settings = save.settings or {}
         abs_now = clock.absolute_minutes(save.game_minutes, settings)
         user_msg = Message(
@@ -107,11 +109,13 @@ def _settle(save_id: int, text: str, tag_raw: str, interrupted: bool) -> dict:
         values = load_attr_values(session, save_id)
         state = parse_state(tag_raw)
         changes: list[dict] = []
+        phase_label: str | None = None
         time_advance = 0
         if state is not None:
             new_values, changes = apply_deltas(
                 defs, values, state.get("attrs") or {}
             )
+            phase_label = phase_of(new_values)
             for key, value in new_values.items():
                 if values.get(key) == value:
                     continue
@@ -132,29 +136,37 @@ def _settle(save_id: int, text: str, tag_raw: str, interrupted: bool) -> dict:
         time_advance = max(0, min(int(time_advance), TIME_MAX_ADVANCE_PER_MESSAGE))
         save.game_minutes += time_advance
 
+        abs_minutes = clock.absolute_minutes(save.game_minutes, settings)
+        virtual = {
+            "absolute_minutes": abs_minutes,
+            **clock.split(abs_minutes),
+            "label": clock.time_label(abs_minutes),
+        }
+
         meta: dict = {"attrs": changes, "time_advance": time_advance}
         if interrupted:
             meta["interrupted"] = True
         if state is None:
             meta["state_parse_failed"] = True
             meta["tag_debug"] = (tag_raw or text[-500:])[:1000]
-        assistant = Message(
-            save_id=save_id,
-            role="assistant",
-            content=text,
-            meta=meta,
-            game_minutes_at=clock.absolute_minutes(save.game_minutes, settings),
-        )
-        session.add(assistant)
+        assistant = None
+        if text.strip():
+            assistant = Message(
+                save_id=save_id,
+                role="assistant",
+                content=text,
+                meta=meta,
+                game_minutes_at=abs_minutes,
+            )
+            session.add(assistant)
         session.commit()
         return {
-            "message_id": assistant.id,
+            "message_id": assistant.id if assistant else None,
             "changes": changes,
+            "phase": phase_label,
             "time_advance": time_advance,
             "game_minutes": save.game_minutes,
-            "virtual_label": clock.time_label(
-                clock.absolute_minutes(save.game_minutes, settings)
-            ),
+            "virtual": virtual,
             "parsed": state is not None,
             "interrupted": interrupted,
         }
@@ -225,8 +237,9 @@ async def chat(save_id: int, req: ChatIn):
                 "state_update",
                 {
                     "attrs": settled["changes"],
+                    "phase": settled["phase"],
                     "game_minutes": settled["game_minutes"],
-                    "virtual_label": settled["virtual_label"],
+                    "virtual_label": settled["virtual"]["label"],
                 },
             )
         yield sse(
@@ -234,7 +247,8 @@ async def chat(save_id: int, req: ChatIn):
             {
                 "advance_minutes": settled["time_advance"],
                 "game_minutes": settled["game_minutes"],
-                "virtual_label": settled["virtual_label"],
+                "virtual_label": settled["virtual"]["label"],
+                "virtual": settled["virtual"],
             },
         )
         if error_payload is not None:
@@ -249,7 +263,7 @@ async def chat(save_id: int, req: ChatIn):
                         "time_advance": settled["time_advance"],
                     },
                     "game_minutes": settled["game_minutes"],
-                    "virtual_label": settled["virtual_label"],
+                    "virtual_label": settled["virtual"]["label"],
                 },
             )
 

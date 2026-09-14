@@ -11,7 +11,7 @@ from sqlalchemy import (
     BigInteger,
     Boolean,
     DateTime,
-    Float,
+    Double,
     ForeignKey,
     Index,
     Integer,
@@ -30,6 +30,9 @@ class Save(Base):
     __tablename__ = "saves"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    character_id: Mapped[int | None] = mapped_column(
+        ForeignKey("characters.id", ondelete="SET NULL"), nullable=True
+    )
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     status: Mapped[str] = mapped_column(String(16), default="active", nullable=False)
     model_key: Mapped[str] = mapped_column(String(192), default="", nullable=False)
@@ -45,18 +48,16 @@ class Save(Base):
 
 
 class Character(Base):
+    """全局唯一的女主角设定书（跨存档共享）。"""
+
     __tablename__ = "characters"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    save_id: Mapped[int] = mapped_column(
-        ForeignKey("saves.id", ondelete="CASCADE"), unique=True, nullable=False
-    )
     name: Mapped[str] = mapped_column(String(64), nullable=False)
     age: Mapped[int] = mapped_column(Integer, nullable=False)
     relation: Mapped[str] = mapped_column(String(64), default="", nullable=False)
     persona: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     freeform: Mapped[str] = mapped_column(Text, default="", nullable=False)
-    template_key: Mapped[str] = mapped_column(String(64), default="", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now, onupdate=datetime.now
@@ -70,9 +71,9 @@ class AttributeDef(Base):
     key: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(64), nullable=False)
     category: Mapped[str] = mapped_column(String(32), default="stat", nullable=False)
-    min: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
-    max: Mapped[float] = mapped_column(Float, default=100.0, nullable=False)
-    default_value: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    min: Mapped[float] = mapped_column(Double, default=0.0, nullable=False)
+    max: Mapped[float] = mapped_column(Double, default=100.0, nullable=False)
+    default_value: Mapped[float] = mapped_column(Double, default=0.0, nullable=False)
     tick_rule: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     ai_editable: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     sort: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -86,7 +87,7 @@ class AttributeValue(Base):
         ForeignKey("saves.id", ondelete="CASCADE"), primary_key=True
     )
     attr_key: Mapped[str] = mapped_column(String(64), primary_key=True)
-    value: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    value: Mapped[float] = mapped_column(Double, default=0.0, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now, onupdate=datetime.now
     )

@@ -3,23 +3,21 @@ Pydantic 请求模型 — 仅定义入参；响应用普通 dict 组装。
 """
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
-
-
-class CharacterIn(BaseModel):
-    name: str = Field(min_length=1, max_length=64)
-    age: int = Field(ge=18, le=999)
-    relation: str = Field(default="朋友", max_length=64)
-    persona: dict = Field(default_factory=dict)
-    freeform: str = Field(default="", max_length=20000)
-    template_key: str = Field(default="", max_length=64)
+from pydantic import BaseModel, Field, field_validator
 
 
 class SaveCreate(BaseModel):
     name: str = Field(min_length=1, max_length=128)
     model_key: str = Field(default="", max_length=192)
-    character: CharacterIn | None = None
     settings: dict | None = None
+
+    @field_validator("name")
+    @classmethod
+    def _strip_name(cls, value: str) -> str:
+        text = value.strip()
+        if not text:
+            raise ValueError("存档名不能为空")
+        return text
 
 
 class SaveUpdate(BaseModel):
@@ -28,9 +26,44 @@ class SaveUpdate(BaseModel):
     status: str | None = Field(default=None, max_length=16)
     settings: dict | None = None
 
+    @field_validator("name")
+    @classmethod
+    def _strip_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        text = value.strip()
+        if not text:
+            raise ValueError("存档名不能为空")
+        return text
+
 
 class ChatIn(BaseModel):
     message: str = Field(min_length=1, max_length=20000)
+
+
+class AttributeDefIn(BaseModel):
+    key: str = Field(min_length=1, max_length=64, pattern=r"^[a-z][a-z0-9_]{0,63}$")
+    name: str = Field(min_length=1, max_length=64)
+    category: str = Field(default="stat", max_length=32)
+    min: float = 0
+    max: float = 100
+    default_value: float = 0
+    tick_rule: dict | None = None
+    ai_editable: bool = True
+    sort: int = 0
+    enabled: bool = True
+
+
+class AttributeDefPatch(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=64)
+    category: str | None = Field(default=None, max_length=32)
+    min: float | None = None
+    max: float | None = None
+    default_value: float | None = None
+    tick_rule: dict | None = None
+    ai_editable: bool | None = None
+    sort: int | None = None
+    enabled: bool | None = None
 
 
 class CatalogModelIn(BaseModel):

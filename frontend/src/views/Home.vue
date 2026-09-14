@@ -11,9 +11,11 @@
     <main class="grid">
       <div v-if="game.loading" class="dim">加载中…</div>
       <div v-else-if="!game.saves.length" class="empty card">
-        <p>还没有存档。</p>
-        <p class="dim">先配置一个模型供应商，然后创建你的角色。</p>
-        <button class="btn primary" @click="createOpen = true">开始</button>
+        <p>还没有存档。准备好开始这段关系了吗？</p>
+        <p class="dim">所有存档共用同一位女主角，新存档从头开始。</p>
+        <div class="row" style="justify-content: center">
+          <button class="btn primary" @click="createOpen = true">开始</button>
+        </div>
       </div>
       <template v-else>
         <div
@@ -29,7 +31,7 @@
             </button>
           </div>
           <div class="dim">
-            {{ save.character?.name || "未设定角色" }}
+            {{ save.character?.name || "未关联女主角" }}
             <span v-if="save.character?.relation">
               · {{ save.character.relation }}
             </span>

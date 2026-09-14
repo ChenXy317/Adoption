@@ -24,8 +24,14 @@ if not exist "frontend\dist\index.html" (
     popd
 )
 
-echo [启动] 服务启动中，浏览器将自动打开 http://127.0.0.1:18730
+echo [启动] 服务启动中...
 start "养成-服务" cmd /k "cd /d %~dp0backend && .venv\Scripts\python.exe main.py"
-timeout /t 3 /nobreak >nul
-start "" http://127.0.0.1:18730
+
+echo [等待] 等待服务就绪（最多 30 秒）...
+powershell -NoProfile -Command "$deadline=(Get-Date).AddSeconds(30); while((Get-Date) -lt $deadline){ try { $c=New-Object Net.Sockets.TcpClient; $c.Connect('127.0.0.1',18730); $c.Close(); exit 0 } catch { Start-Sleep -Milliseconds 500 } }; exit 1"
+if errorlevel 1 (
+    echo [提示] 服务启动较慢，请稍后手动打开 http://127.0.0.1:18730
+) else (
+    start "" http://127.0.0.1:18730
+)
 exit /b 0
