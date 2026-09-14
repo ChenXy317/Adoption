@@ -20,20 +20,17 @@ from helpers import (
     error,
     get_global_character,
     get_runtime,
+    get_save_character,
     get_save_or_error,
 )
-from orm import AttributeDef, AttributeValue, Character, Message, Save
+from orm import AttributeDef, AttributeValue, Message, Save
 from schemas import SaveCreate, SaveUpdate
 
 router = APIRouter(tags=["saves"])
 
 
 def save_summary(session: Session, save: Save, message_count: int | None = None) -> dict:
-    character = (
-        session.get(Character, save.character_id)
-        if save.character_id
-        else None
-    )
+    character = get_save_character(session, save)
     if message_count is None:
         message_count = session.scalar(
             select(func.count(Message.id)).where(Message.save_id == save.id)

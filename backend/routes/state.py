@@ -14,15 +14,17 @@ from helpers import (
     attribute_items,
     behavior_count,
     character_dict,
+    get_save_character,
     get_save_or_error,
     load_attr_values,
 )
-from orm import AttributeDef, Character, EventDef, EventLog, Message
+from orm import AttributeDef, EventDef, EventLog, Message
 
 router = APIRouter(tags=["state"])
 
 MESSAGES_MAX_LIMIT = 200
 WALLET_FLOW_LIMIT = 8
+WALLET_FLOW_SCAN = 120
 
 
 def _wallet_flows(session: Session, save_id: int) -> list[dict]:
@@ -32,7 +34,7 @@ def _wallet_flows(session: Session, save_id: int) -> list[dict]:
             select(EventLog)
             .where(EventLog.save_id == save_id)
             .order_by(EventLog.id.desc())
-            .limit(WALLET_FLOW_LIMIT * 2)
+            .limit(WALLET_FLOW_SCAN)
         )
     )
     flows: list[dict] = []
@@ -71,9 +73,7 @@ def get_state(save_id: int, session: Session = Depends(get_session)):
         select(AttributeDef).order_by(AttributeDef.sort, AttributeDef.id)
     ).all()
     values = load_attr_values(session, save_id)
-    character = (
-        session.get(Character, save.character_id) if save.character_id else None
-    )
+    character = get_save_character(session, save)
     active_flag = scenes.get_active(session, save_id)
     recent_rows = session.execute(
         select(EventLog, EventDef.name)
@@ -108,7 +108,7 @@ def get_state(save_id: int, session: Session = Depends(get_session)):
         "character": character_dict(character),
         "phase": phase_of(values),
         "tendency": tendency_of(values, behavior_count(session, save_id))[1],
-        "mood_label": str(flags.get("mood_label") or ""),
+        "mood_label": events.mood_label_of(flags, absolute),
         "virtual": {
             "absolute_minutes": absolute,
             **split,

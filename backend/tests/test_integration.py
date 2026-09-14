@@ -17,6 +17,7 @@ from fastapi import HTTPException
 from pydantic import ValidationError
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
+from starlette.background import BackgroundTasks
 
 import routes.advance as advance_route
 import routes.backup as backup_route
@@ -54,6 +55,7 @@ from orm import (
 )
 from schemas import (
     AdvanceIn,
+    ChatIn,
     EventDefIn,
     EventDefPatch,
     SceneDefIn,
@@ -559,6 +561,158 @@ class SettlementIntegrationTest(unittest.TestCase):
             state_route.get_state(save_id, session=session)["mood_label"], "开心"
         )
 
+    def test_chat_mood_label_expires_with_time(self):
+        session = self._session()
+        defs = self._defs(session)
+        save, _values = self._save(session, defs)
+        save_id = save.id
+
+        chat_route._settle(save_id, "回复", '{"mood_label": "开心"}', False)
+        session.rollback()
+        self.assertEqual(events.load_flags(session, save_id).get("mood_label"), "开心")
+
+        advance_route.advance(save_id, AdvanceIn(minutes=clock.DAY_MINUTES), session=session)
+        self.assertEqual(
+            state_route.get_state(save_id, session=session)["mood_label"], "开心"
+        )
+
+        advance_route.advance(save_id, AdvanceIn(minutes=1), session=session)
+        self.assertEqual(
+            state_route.get_state(save_id, session=session)["mood_label"], ""
+        )
+
+    def test_chat_rejects_blank_message(self):
+        session = self._session()
+        defs = self._defs(session)
+        save, _values = self._save(session, defs)
+        session.commit()
+
+        with self.assertRaises(HTTPException) as ctx:
+            asyncio.run(
+                chat_route.chat(save.id, ChatIn(message="   "), BackgroundTasks())
+            )
+        self.assertEqual(ctx.exception.status_code, 400)
+
+    def test_neglect_can_be_disabled_via_settings(self):
+        session = self._session()
+        defs = self._defs(session)
+        save, _values = self._save(session, defs)
+        save.settings = {**(save.settings or {}), "neglect": {"days": 0}}
+        session.commit()
+
+        for _ in range(4):
+            advance_route.advance(save.id, AdvanceIn(minutes=1440), session=session)
+
+        self.assertEqual(load_attr_values(session, save.id)["affection"], 10.0)
+        self.assertIsNone(events.load_flags(session, save.id).get("neglect"))
+
+    def test_scene_def_removed_aborts_open_log(self):
+        session = self._session()
+        defs = self._defs(session)
+        save, values = self._save(session, defs)
+        scene = SceneDef(
+            key="gone", name="将被删除", category="story", enter_trigger={},
+            enter_cost={}, scene_prompt="", goal="", min_turns=1, max_turns=3,
+            exit={}, effects={}, next_scenes=[], once=False,
+            cooldown_minutes=0, priority=0, enabled=True,
+        )
+        session.add(scene)
+        session.commit()
+
+        events.settle_time(session, save, defs, values, 10, source="chat")
+        session.commit()
+        self.assertEqual(scenes.get_active(session, save.id)["key"], "gone")
+
+        session.delete(scene)
+        session.commit()
+        values = load_attr_values(session, save.id)
+        events.settle_time(session, save, defs, values, 20, source="chat")
+        session.commit()
+
+        self.assertIsNone(scenes.get_active(session, save.id))
+        log = session.scalar(select(SceneLog).where(SceneLog.scene_key == "gone"))
+        self.assertEqual(log.status, "aborted")
+
+    def test_scene_money_flows_recorded(self):
+        session = self._session()
+        defs = self._defs(session)
+        save, values = self._save(session, defs)
+        session.add(
+            SceneDef(
+                key="paid_scene", name="付费场景", category="story",
+                enter_trigger={}, enter_cost={"money": 100}, scene_prompt="",
+                goal="", min_turns=0, max_turns=1, exit={},
+                effects={"attrs": {"money": 30}}, next_scenes=[], once=False,
+                cooldown_minutes=0, priority=0, enabled=True,
+            )
+        )
+        session.commit()
+        save_id = save.id
+
+        events.settle_time(session, save, defs, values, 10, source="chat")
+        session.commit()
+        self.assertEqual(load_attr_values(session, save_id)["money"], 1900.0)
+
+        values = load_attr_values(session, save_id)
+        events.settle_time(
+            session, save, defs, values, 20, source="chat",
+            state_scene={"action": "end", "summary": "收尾"},
+        )
+        session.commit()
+        self.assertEqual(load_attr_values(session, save_id)["money"], 1930.0)
+
+        flows = state_route.get_state(save_id, session=session)["wallet_flows"]
+        self.assertEqual([flow["amount"] for flow in flows[:2]], [30.0, -100.0])
+        self.assertTrue(all(flow["category"] == "scene" for flow in flows[:2]))
+
+    def test_recent_events_only_injected_once(self):
+        session = self._session()
+        defs = self._defs(session)
+        save, _values = self._save(session, defs)
+        session.add(
+            EventLog(
+                save_id=save.id, event_id=None, status="triggered",
+                content="事件原文", meta={"key": "evt", "name": "事件"},
+                game_minutes_at=clock.absolute_minutes(0, {}),
+            )
+        )
+        session.commit()
+
+        first = events.recent_events(session, save, window_minutes=180, limit=3)
+        self.assertEqual([item["name"] for item in first], ["事件"])
+        events.mark_events_narrated(session, [item["log_id"] for item in first])
+        session.commit()
+
+        second = events.recent_events(session, save, window_minutes=180, limit=3)
+        self.assertEqual(second, [])
+
+    def test_messages_pagination(self):
+        session = self._session()
+        defs = self._defs(session)
+        save, _values = self._save(session, defs)
+        save_id = save.id
+        self._add_messages(session, save_id, 25)
+        session.commit()
+
+        first = state_route.list_messages(
+            save_id, limit=10, before_id=None, session=session
+        )
+        self.assertEqual(len(first["messages"]), 10)
+        self.assertTrue(first["has_more"])
+        self.assertEqual(
+            [m["content"] for m in first["messages"]],
+            [f"消息{i}" for i in range(15, 25)],
+        )
+
+        older = state_route.list_messages(
+            save_id, limit=10, before_id=first["messages"][0]["id"], session=session
+        )
+        self.assertEqual(
+            [m["content"] for m in older["messages"]],
+            [f"消息{i}" for i in range(5, 15)],
+        )
+        self.assertTrue(older["has_more"])
+
     def test_proactive_event_on_advance(self):
         session = self._session()
         defs = self._defs(session)
@@ -888,6 +1042,24 @@ class SettlementIntegrationTest(unittest.TestCase):
                 session, {"format": backup_route.BACKUP_FORMAT, "version": 99}
             )
         self.assertEqual(version.exception.status_code, 400)
+
+    def test_import_backup_rejects_duplicate_attributes(self):
+        session = self._session()
+        defs = self._defs(session)
+        self._save(session, defs)
+        session.commit()
+        payload = {
+            "format": backup_route.BACKUP_FORMAT,
+            "version": backup_route.BACKUP_VERSION,
+            "save": {"name": "坏备份"},
+            "attributes": [
+                {"key": "affection", "value": 1},
+                {"key": "affection", "value": 2},
+            ],
+        }
+        with self.assertRaises(HTTPException) as ctx:
+            backup_route.import_backup(session, payload)
+        self.assertEqual(ctx.exception.status_code, 400)
 
     def test_import_backup_clears_unknown_model_key(self):
         session = self._session()

@@ -1,6 +1,14 @@
 """事件引擎纯函数层单元测试：条件求值、每日判定、可用性与冷却。"""
+import json
 import unittest
 
+from config import (
+    GIFT_TIERS,
+    MOOD_LABEL_TTL_HOURS,
+    SEEDS_DIR,
+    WORK_HOURS,
+    WORK_PAY,
+)
 from game import clock
 from game.events import (
     EvalContext,
@@ -8,6 +16,7 @@ from game.events import (
     check_cost,
     compare,
     evaluate,
+    mood_label_of,
     roll_chance,
 )
 from orm import EventDef
@@ -261,6 +270,50 @@ class CostTest(unittest.TestCase):
         self.assertEqual(reason, "insufficient_money")
         self.assertTrue(check_cost(values, {})[0])
         self.assertTrue(check_cost(values, None)[0])
+
+
+class MoodLabelTest(unittest.TestCase):
+    """心情短语的有效期判定。"""
+
+    def test_missing_and_empty(self):
+        self.assertEqual(mood_label_of({}, 1000), "")
+        self.assertEqual(mood_label_of({"mood_label": "  "}, 1000), "")
+
+    def test_fresh_and_expired(self):
+        ttl = MOOD_LABEL_TTL_HOURS * 60
+        flags = {"mood_label": "开心", "mood_label_at": 1000}
+        self.assertEqual(mood_label_of(flags, 1000 + ttl), "开心")
+        self.assertEqual(mood_label_of(flags, 1000 + ttl + 1), "")
+
+    def test_legacy_without_timestamp_expires(self):
+        self.assertEqual(mood_label_of({"mood_label": "开心"}, 1000), "")
+
+
+class SeedBalanceTest(unittest.TestCase):
+    """种子中的经济数值与 config 定稿参数保持一致，防止两处漂移。"""
+
+    @classmethod
+    def setUpClass(cls):
+        path = SEEDS_DIR / "events.json"
+        with open(path, encoding="utf-8") as f:
+            cls.events = {item["key"]: item for item in json.load(f)}
+
+    def test_work_values(self):
+        event = self.events["work_convenience"]
+        self.assertEqual(event["cost"]["time_minutes"], WORK_HOURS * 60)
+        self.assertEqual(event["effects"]["attrs"]["money"], WORK_PAY)
+
+    def test_gift_tiers(self):
+        small = self.events["gift_small"]
+        large = self.events["gift_large"]
+        self.assertEqual(small["cost"]["money"], GIFT_TIERS["small"]["price"])
+        self.assertEqual(
+            small["effects"]["attrs"]["affection"], GIFT_TIERS["small"]["affection"]
+        )
+        self.assertEqual(large["cost"]["money"], GIFT_TIERS["large"]["price"])
+        self.assertEqual(
+            large["effects"]["attrs"]["affection"], GIFT_TIERS["large"]["affection"]
+        )
 
 
 if __name__ == "__main__":

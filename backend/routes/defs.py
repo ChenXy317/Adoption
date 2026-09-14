@@ -138,21 +138,31 @@ def delete_attribute_def(
 
 # ── 事件定义 ──
 
+_seed_keys_cache: dict[str, tuple[float, set[str]]] = {}
+
+
 def _seed_keys(filename: str) -> set[str]:
-    """读取种子文件中定义的 key 集合（用于标记内置定义）。"""
+    """读取种子文件中定义的 key 集合（按 mtime 缓存，供内置定义标记复用）。"""
     path = SEEDS_DIR / filename
-    if not path.exists():
+    try:
+        mtime = path.stat().st_mtime
+    except OSError:
         return set()
+    cached = _seed_keys_cache.get(filename)
+    if cached is not None and cached[0] == mtime:
+        return cached[1]
     try:
         with open(path, encoding="utf-8") as f:
             items = json.load(f)
     except (OSError, json.JSONDecodeError):
         return set()
-    return {
+    keys = {
         str(item.get("key") or "").strip()
         for item in items
         if isinstance(item, dict) and str(item.get("key") or "").strip()
     }
+    _seed_keys_cache[filename] = (mtime, keys)
+    return keys
 
 
 def _event_dict(d: EventDef, seed_keys: set[str]) -> dict:

@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from config import (
     EVENT_MAX_PER_SETTLEMENT,
+    MOOD_LABEL_TTL_HOURS,
     NEGLECT_AFFECTION_MAX,
     NEGLECT_AFFECTION_PER_DAY,
     NEGLECT_DAYS,
@@ -259,6 +260,30 @@ def set_flag(session: Session, save_id: int, key: str, value) -> None:
 
 AI_FLAG_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 _AI_FLAG_RESERVED = {"active_scene", "random_rolls", "neglect", "mood_label"}
+MOOD_LABEL_AT_FLAG = "mood_label_at"
+
+
+def set_mood_label(session: Session, save_id: int, label: str, at_abs: int) -> None:
+    """写入心情短语并记录设置时刻，超期后不再注入 prompt。"""
+    set_flag(session, save_id, "mood_label", str(label or "").strip()[:32])
+    set_flag(session, save_id, MOOD_LABEL_AT_FLAG, int(at_abs))
+
+
+def mood_label_of(flags: dict | None, now_abs: int) -> str:
+    """读取未过期的心情短语；旧数据缺时间戳视为已过期（不再长期注入）。"""
+    raw = (flags or {}).get("mood_label")
+    label = str(raw or "").strip()
+    if not label:
+        return ""
+    raw_at = (flags or {}).get(MOOD_LABEL_AT_FLAG)
+    try:
+        at_abs = int(raw_at)
+    except (TypeError, ValueError):
+        return ""
+    ttl = max(0, int(MOOD_LABEL_TTL_HOURS)) * 60
+    if ttl and int(now_abs) - at_abs > ttl:
+        return ""
+    return label
 
 
 def apply_ai_flags(session: Session, save_id: int, flags) -> dict:
@@ -500,9 +525,11 @@ def apply_neglect(
         except (TypeError, ValueError):
             return default
 
-    threshold_days = _int("days", NEGLECT_DAYS) or NEGLECT_DAYS
-    per_day = _int("per_day", NEGLECT_AFFECTION_PER_DAY) or NEGLECT_AFFECTION_PER_DAY
-    max_days = _int("max", NEGLECT_AFFECTION_MAX) or NEGLECT_AFFECTION_MAX
+    threshold_days = _int("days", NEGLECT_DAYS)
+    per_day = _int("per_day", NEGLECT_AFFECTION_PER_DAY)
+    max_days = _int("max", NEGLECT_AFFECTION_MAX)
+    if threshold_days <= 0 or per_day <= 0 or max_days <= 0:
+        return []
 
     fallback = clock.absolute_minutes(0, save.settings or {})
     last_dialogue = int(
@@ -880,7 +907,7 @@ MANUAL_REASON_TEXT = {
 
 
 def recent_events(session: Session, save: Save, *, window_minutes: int, limit: int = 3) -> list[dict]:
-    """最近窗口内触发的普通事件（用于 prompt 情境块）。"""
+    """最近窗口内尚未注入过的普通事件（用于 prompt 情境块，每条只注入一次）。"""
     settings = save.settings or {}
     now_abs = clock.absolute_minutes(save.game_minutes, settings)
     rows = list(
@@ -891,16 +918,30 @@ def recent_events(session: Session, save: Save, *, window_minutes: int, limit: i
                 EventLog.game_minutes_at >= now_abs - int(window_minutes),
             )
             .order_by(EventLog.id.desc())
-            .limit(limit)
+            .limit(max(1, limit) + 20)
         )
     )
-    rows.reverse()
-    return [
-        {
-            "key": (row.meta or {}).get("key", ""),
-            "name": (row.meta or {}).get("name", ""),
-            "category": (row.meta or {}).get("category", ""),
+    items: list[dict] = []
+    for row in rows:
+        meta = row.meta or {}
+        if meta.get("narrated") or str(meta.get("category") or "") == "scene":
+            continue
+        items.append({
+            "log_id": row.id,
+            "key": meta.get("key", ""),
+            "name": meta.get("name", ""),
+            "category": meta.get("category", ""),
             "content": row.content,
-        }
-        for row in rows
-    ]
+        })
+        if len(items) >= limit:
+            break
+    items.reverse()
+    return items
+
+
+def mark_events_narrated(session: Session, log_ids: list[int]) -> None:
+    """标记事件情境已注入 prompt，避免后续每轮重复注入（调用方负责 commit）。"""
+    for log_id in log_ids:
+        row = session.get(EventLog, int(log_id))
+        if row is not None:
+            row.meta = {**(row.meta or {}), "narrated": True}

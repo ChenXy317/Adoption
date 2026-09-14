@@ -1,6 +1,6 @@
 # STATUS — 当前状态记录
 
-> 更新时间：2026-09-14（M5 后审查修复已提交 `bab2d80`；M6 打磨已提交 `f9dec71`）
+> 更新时间：2026-09-14（M5 后审查修复已提交 `bab2d80`；M6 打磨已提交 `f9dec71`；M6 后全量审查修复已完成，待提交）
 > 用途：跨会话交接。新会话先读 `PLAN.md`（唯一真相源）+ 本文件，再动手。
 
 ## 一、项目速览
@@ -24,6 +24,7 @@
 | M5 行动与经济（打工+钱包、送礼两档、冷落、性格倾向、主动消息、事件链） | 已完成，已提交 `a953e5e` |
 | M5 后全量审查修复（场景冷却、总结兜底、STATE 协议闭环、断流竞态、参数防御、种子启停） | 已完成，已提交 `bab2d80` |
 | M6 打磨（导出/恢复、定义管理界面与调试触发、暗/亮主题） | 已完成，已提交 `f9dec71` |
+| M6 后全量审查修复（备份校验、场景收尾、钱包流水、消息分页、心情有效期等 17 项） | 已完成，待提交 |
 
 ## 三、运行方式
 
@@ -32,7 +33,7 @@
 - 服务端口：**18730**（`APP_PORT` 可配）；启动后浏览器开 `http://127.0.0.1:18730`
 - 启动：双击 `快速启动.bat`（缺 dist 会自动构建）；或手动：
   `cd backend; .venv\Scripts\python.exe main.py`
-- 测试：`cd backend; .venv\Scripts\python.exe -m unittest discover -s tests`（**107 项**，含 14 项 DB 集成测试）
+- 测试：`cd backend; .venv\Scripts\python.exe -m unittest discover -s tests`（**138 项**，含 32 项接口/DB 集成测试）
 - 前端：改动后 `cd frontend; npm run build`（后端托管 dist）；开发模式 `npm run dev`（Vite 代理 18730）
 
 ## 四、数据现状（库内）
@@ -133,6 +134,27 @@
 测试
 - `test_integration.py` 新增 6 项：导出导入往返、非法格式与版本拒绝、未知模型 key 置空、事件定义 CRUD（重复 key/非法分类）、场景定义 CRUD（轮数校验）、debug 触发（分类拦截、效果只应用一次、source=debug）
 
+**M6 后全量审查修复（已完成，待提交）**
+
+后端
+- `routes/backup.py`：导入时属性 key 重复返回 400（原先 IntegrityError→500）、消息 `game_minutes_at` 钳制非负、事件/场景日志与记忆数量上限（20000）；导出/展示统一走 `get_save_character`（character_id 缺失回退全局女主角）
+- `game/scenes.py`：活跃场景的定义被删除/停用时改为 `abort_scene` 落 `aborted` 日志（原先静默清 active 遗留 started）；场景进入花费与结束效果的金钱变动补写 `event_logs`（category=scene），钱包「最近收支」不再漏记
+- `routes/chat.py`：空白消息（strip 后为空）返回 400；`_prepare` 标记事件情境已注入（`meta.narrated`），每条事件只在触发后的第一轮 prompt 注入一次；心情短语写入 `mood_label_at`；SSE 返回有效期内的实际心情
+- `game/events.py`：新增 `mood_label_of` / `set_mood_label`（TTL=`MOOD_LABEL_TTL_HOURS` 24 虚拟小时，超期不再注入；旧数据缺时间戳视为过期）；`recent_events` 过滤已注入与场景类日志；冷落参数显式支持 0=禁用（原先 0 被替换成默认值）
+- `config.py`：新增 `MOOD_LABEL_TTL_HOURS`
+- `routes/state.py`：钱包流水扫描深度 16 → 120；`mood_label` 走有效期判定；角色回退
+- `seeds/loader.py`：种子数值字段统一安全转换（null/非法值不再导致启动崩溃）
+- `routes/defs.py`：`_seed_keys` 按 mtime 缓存，列表接口不再每次读盘
+- `ai_client.py`：`_looks_like_unknown_param` 去掉过宽的 `invalid parameter` 匹配（避免无谓重试）
+- `main.py`：`server.log` 改为 5MB × 3 轮转
+- `helpers.py`：新增 `get_save_character`
+
+前端
+- `stores/chat.js` + `components/ChatStream.vue` + `views/Game.vue`：消息历史「加载更早的消息」（利用已有 `before_id`/`has_more`，前置插入并保持滚动位置；自动滚底改为只看最后一条消息变化）
+
+测试
+- `unittest` 123 → **138 项**：新增心情 TTL/旧数据过期、种子与 config 数值一致性、关闭思考参数识别范围、空白消息 400、冷落禁用、场景定义删除落 aborted、场景金钱流水、事件只注入一次、消息分页、导入重复属性拒绝
+
 ## 六、验证记录（2026-09-14）
 
 - `unittest` **107 项**全过（纯函数 93 + DB 集成 14）；`npm run build` 通过
@@ -141,6 +163,7 @@
 - 审查修复复验（2026-09-14）：`unittest` **117 项**全过（纯函数 99 + DB 集成 18，新增 10 项）；`npm run build` 通过；httpx 端到端（真实模型 aihubmix，临时档已清理，20 项全过）：SSE 链路、`tendency` 字符串、事件触发与时间推进、时间说明均正常
 - M6 导出恢复验证（2026-09-14）：`unittest` **120 项**全过（新增 3 项）；`npm run build` 通过；httpx 端到端（正式档只读导出 → 导入 → 消息/属性/时间一致性校验 → 清理，15 项全过）；浏览器实测首页「导入存档」上传备份 → 跳转新档且 6 条消息与属性完整恢复 → 返回列表双档显示 → 测试档已清理
 - M6 定义管理/主题验证（2026-09-14）：`unittest` **123 项**全过（新增 3 项）；`npm run build` 通过；httpx 端到端（定义 CRUD、调试触发与清理，16 项全过）；浏览器实测定义弹层（24 事件/3 场景、内置标记、编辑表单渲染正确）、亮/暗主题切换与 localStorage 持久化；期间修复 debug 触发 fixed 事件被同次结算重复收集的缺陷
+- M6 后审查修复复验（2026-09-14）：`unittest` **138 项**全过（纯函数 106 + 集成 32，新增 15 项）；`npm run build` 通过；httpx 端到端（临时起服务，8 项全过）：空白消息 400、推进 1 天、state 结构、消息分页字段、导入重复属性 400、导出导入往返；临时档与测试库均已清理（库内仅正式档 id=6）
 
 ## 七、关键决策速查（M4 实现口径）
 
@@ -181,7 +204,7 @@
 
 ## 十、给下一个会话的建议
 
-- 动手前：读 `PLAN.md` + 本文件 → `git status`（M5 后审查修复已提交 `bab2d80`；M6 打磨已完成，待提交）
+- 动手前：读 `PLAN.md` + 本文件 → `git status`（M5 后审查修复已提交 `bab2d80`；M6 打磨已提交 `f9dec71`；M6 后全量审查修复已完成，待提交）
 - 可选后置项：向量检索（embedding top-K）、M5 扩展（付费事件即时 AI 演出、更多打工/礼物种子）；新增事件/场景可直接用「定义管理」界面或种子文件
 - 后端改动需重启服务（未开 reload）；前端改动需 `npm run build`
 - 验证习惯：先 `unittest` → 再 httpx 端到端（含 SSE/真实模型）→ 最后浏览器实测

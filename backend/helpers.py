@@ -181,6 +181,15 @@ def get_global_character(session: Session) -> Character | None:
     return session.scalar(select(Character).order_by(Character.id).limit(1))
 
 
+def get_save_character(session: Session, save: Save) -> Character | None:
+    """存档关联的女主角；引用缺失时回退到全局女主角（自愈旧数据）。"""
+    if save.character_id:
+        character = session.get(Character, save.character_id)
+        if character is not None:
+            return character
+    return get_global_character(session)
+
+
 def attribute_items(
     defs: list[AttributeDef], values: dict[str, float]
 ) -> list[dict]:

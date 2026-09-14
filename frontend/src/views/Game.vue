@@ -16,7 +16,7 @@
 
     <div class="body">
       <main class="chat card">
-        <ChatStream />
+        <ChatStream :save-id="$route.params.id" />
         <ChatInput :save-id="$route.params.id" />
       </main>
 

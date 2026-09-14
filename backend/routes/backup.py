@@ -17,10 +17,15 @@ from sqlalchemy.orm import Session
 from ai_client import AIClientError
 from db import get_session
 from game import events, memory
-from helpers import error, get_global_character, get_runtime, get_save_or_error
+from helpers import (
+    error,
+    get_global_character,
+    get_runtime,
+    get_save_character,
+    get_save_or_error,
+)
 from orm import (
     AttributeValue,
-    Character,
     EventDef,
     EventLog,
     Memory,
@@ -38,6 +43,7 @@ BACKUP_VERSION = 1
 
 MAX_NAME_LENGTH = 128
 MAX_IMPORT_MESSAGES = 50000
+MAX_IMPORT_RECORDS = 20000
 
 _ROLES = ("user", "assistant", "system", "event")
 _MEMORY_STATUSES = ("active", "archived")
@@ -72,9 +78,7 @@ def _as_float(value, default: float = 0.0) -> float:
 
 def build_backup(session: Session, save: Save) -> dict:
     """组装存档的完整导出结构。"""
-    character = (
-        session.get(Character, save.character_id) if save.character_id else None
-    )
+    character = get_save_character(session, save)
     attributes = [
         {"key": row.attr_key, "value": row.value}
         for row in session.scalars(
@@ -218,16 +222,20 @@ def import_backup(session: Session, payload: dict, name: str | None = None) -> S
     session.add(save)
     session.flush()
 
+    seen_attr_keys: set[str] = set()
     for item in payload.get("attributes") or []:
         if not isinstance(item, dict):
             continue
-        key = str(item.get("key") or "").strip()
+        key = str(item.get("key") or "").strip()[:64]
         if not key:
             continue
+        if key in seen_attr_keys:
+            error("invalid_backup", f"备份属性 key 重复：{key}", 400)
+        seen_attr_keys.add(key)
         session.add(
             AttributeValue(
                 save_id=save.id,
-                attr_key=key[:64],
+                attr_key=key,
                 value=_as_float(item.get("value")),
             )
         )
@@ -247,6 +255,18 @@ def import_backup(session: Session, payload: dict, name: str | None = None) -> S
             f"备份消息数量超出上限（{MAX_IMPORT_MESSAGES} 条）",
             400,
         )
+    for field, label in (
+        ("event_logs", "事件日志"),
+        ("scene_logs", "场景日志"),
+        ("memories", "记忆"),
+    ):
+        raw_items = payload.get(field) or []
+        if isinstance(raw_items, list) and len(raw_items) > MAX_IMPORT_RECORDS:
+            error(
+                "backup_too_large",
+                f"备份{label}数量超出上限（{MAX_IMPORT_RECORDS} 条）",
+                400,
+            )
     id_map: dict[int, int] = {}
     message_rows: list[Message] = []
     for item in raw_messages:
@@ -259,7 +279,7 @@ def import_backup(session: Session, payload: dict, name: str | None = None) -> S
                 role=role,
                 content=str(item.get("content") or ""),
                 meta=item.get("meta") if isinstance(item.get("meta"), dict) else {},
-                game_minutes_at=_as_int(item.get("game_minutes_at")),
+                game_minutes_at=max(0, _as_int(item.get("game_minutes_at"))),
                 created_at=_parse_dt(item.get("created_at")) or datetime.now(),
             )
         )

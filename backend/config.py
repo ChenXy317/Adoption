@@ -62,6 +62,7 @@ CALENDAR_DEFAULT = {"month": 5, "day": 1, "hour": 8, "minute": 0}
 
 # ── 属性 ──
 ATTR_MAX_DELTA_PER_MESSAGE = 20  # 单轮状态标签对单个属性的变化上限
+MOOD_LABEL_TTL_HOURS = 24        # 心情短语的有效期（虚拟小时，超时不再注入）
 
 # ── 事件（详见 PLAN 5.3）──
 EVENT_MAX_PER_SETTLEMENT = 3       # 单次结算最多注入的事件数

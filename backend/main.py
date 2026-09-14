@@ -10,6 +10,7 @@ import logging
 import os
 import sys
 from contextlib import asynccontextmanager
+from logging.handlers import RotatingFileHandler
 
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
@@ -40,9 +41,14 @@ from seeds.loader import (
 )
 
 def _setup_logging() -> None:
-    """日志始终写文件；有控制台（非 pythonw）时同时输出到 stderr。"""
+    """日志始终写文件（5MB × 3 轮转）；有控制台（非 pythonw）时同时输出到 stderr。"""
     handlers: list[logging.Handler] = [
-        logging.FileHandler(BASE_DIR / "server.log", encoding="utf-8")
+        RotatingFileHandler(
+            BASE_DIR / "server.log",
+            encoding="utf-8",
+            maxBytes=5 * 1024 * 1024,
+            backupCount=3,
+        )
     ]
     if sys.stderr is not None:
         handlers.append(logging.StreamHandler(sys.stderr))

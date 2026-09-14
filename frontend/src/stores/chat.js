@@ -14,11 +14,32 @@ export const useChatStore = defineStore("chat", {
     messages: [],
     streaming: false,
     error: "",
+    hasMore: false,
+    loadingEarlier: false,
   }),
   actions: {
     async loadMessages(saveId) {
       const data = await apiGet(`/api/saves/${saveId}/messages?limit=200`);
       this.messages = data.messages;
+      this.hasMore = Boolean(data.has_more);
+    },
+    async loadEarlier(saveId) {
+      if (!this.hasMore || this.loadingEarlier) return 0;
+      const first = this.messages.find((m) => m.id > 0);
+      if (!first) return 0;
+      this.loadingEarlier = true;
+      try {
+        const data = await apiGet(
+          `/api/saves/${saveId}/messages?limit=200&before_id=${first.id}`
+        );
+        const known = new Set(this.messages.map((m) => m.id));
+        const older = (data.messages || []).filter((m) => !known.has(m.id));
+        this.messages.unshift(...older);
+        this.hasMore = Boolean(data.has_more);
+        return older.length;
+      } finally {
+        this.loadingEarlier = false;
+      }
     },
     pushMessages(list) {
       for (const message of list || []) {

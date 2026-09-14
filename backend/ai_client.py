@@ -176,7 +176,6 @@ class AIClient:
             "unexpected keyword",
             "extra inputs",
             "not a valid parameter",
-            "invalid parameter",
             "未知参数",
             "不支持的参数",
         )

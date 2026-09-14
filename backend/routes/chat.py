@@ -25,12 +25,14 @@ from game.prompt import build_messages
 from game.tags import StateTagStripper, parse_state
 from helpers import (
     behavior_count,
+    error,
     get_runtime,
+    get_save_character,
     get_save_or_error,
     load_attr_values,
     save_settle_lock,
 )
-from orm import AttributeDef, Character, Message, Save
+from orm import AttributeDef, Message, Save
 from schemas import ChatIn
 
 router = APIRouter(tags=["chat"])
@@ -57,16 +59,10 @@ def _prepare(save_id: int, message: str) -> dict:
     try:
         save = get_save_or_error(session, save_id)
         if not save.model_key:
-            from helpers import error
-
             error("model_not_set", "该存档尚未选择模型，请先在「模型配置」中选择", 400)
         runtime = get_runtime(session, save.model_key)
-        character = (
-            session.get(Character, save.character_id) if save.character_id else None
-        )
+        character = get_save_character(session, save)
         if character is None:
-            from helpers import error
-
             error("character_missing", "该存档未关联女主角设定书", 400)
         settings = save.settings or {}
         abs_now = clock.absolute_minutes(save.game_minutes, settings)
@@ -97,12 +93,17 @@ def _prepare(save_id: int, message: str) -> dict:
         active_events = events.recent_events(
             session, save, window_minutes=EVENT_RECENT_WINDOW_MINUTES, limit=3
         )
+        if active_events:
+            events.mark_events_narrated(
+                session, [item["log_id"] for item in active_events]
+            )
         active_scene = scenes.get_active(session, save_id)
         memories = memory.retrieve(session, save_id)
         if memories:
             memory.mark_recalled(session, [m["id"] for m in memories])
-            session.commit()
         flags = events.load_flags(session, save_id)
+        if active_events or memories:
+            session.commit()
         messages = build_messages(
             save,
             character,
@@ -114,7 +115,7 @@ def _prepare(save_id: int, message: str) -> dict:
             active_scene,
             memories,
             tendency=tendency_of(values, behavior_count(session, save_id)),
-            mood_label=str(flags.get("mood_label") or ""),
+            mood_label=events.mood_label_of(flags, abs_now),
         )
         return {
             "messages": messages,
@@ -143,6 +144,7 @@ def _settle(save_id: int, text: str, tag_raw: str, interrupted: bool) -> dict:
             defs_map = {d.key: d for d in defs}
             values = load_attr_values(session, save_id)
             old_game = int(save.game_minutes)
+            abs_before = clock.absolute_minutes(old_game, settings)
             state = parse_state(tag_raw)
             changes: list[dict] = []
             raw_advance = None
@@ -167,7 +169,7 @@ def _settle(save_id: int, text: str, tag_raw: str, interrupted: bool) -> dict:
                 raw_mood = state.get("mood_label")
                 if isinstance(raw_mood, str) and raw_mood.strip():
                     mood_label = raw_mood.strip()[:32]
-                    events.set_flag(session, save_id, "mood_label", mood_label)
+                    events.set_mood_label(session, save_id, mood_label, abs_before)
             if raw_advance is None:
                 time_advance = default_advance
             else:
@@ -177,7 +179,6 @@ def _settle(save_id: int, text: str, tag_raw: str, interrupted: bool) -> dict:
                     time_advance = default_advance
             time_advance = max(0, min(int(time_advance), max_advance))
 
-            abs_before = clock.absolute_minutes(old_game, settings)
             meta: dict = {"attrs": changes, "time_advance": time_advance}
             if applied_flags:
                 meta["flags"] = applied_flags
@@ -224,6 +225,9 @@ def _settle(save_id: int, text: str, tag_raw: str, interrupted: bool) -> dict:
             memory_due = memory.trigger_if_due(session, save_id)
 
             abs_minutes = clock.absolute_minutes(save.game_minutes, settings)
+            effective_mood = events.mood_label_of(
+                events.load_flags(session, save_id), abs_minutes
+            )
             virtual = {
                 "absolute_minutes": abs_minutes,
                 **clock.split(abs_minutes),
@@ -236,7 +240,7 @@ def _settle(save_id: int, text: str, tag_raw: str, interrupted: bool) -> dict:
                 "ai_changes": changes,
                 "phase": phase_of(values),
                 "tendency": tendency_of(values, behavior_count(session, save_id))[1],
-                "mood_label": mood_label,
+                "mood_label": effective_mood,
                 "time_advance": total_advance,
                 "game_minutes": save.game_minutes,
                 "virtual": virtual,
@@ -280,6 +284,8 @@ def _settle_in_thread(save_id: int, text: str, tag_raw: str) -> None:
 @router.post("/api/saves/{save_id}/chat")
 async def chat(save_id: int, req: ChatIn, background: BackgroundTasks):
     message = req.message.strip()
+    if not message:
+        error("empty_message", "消息不能为空", 400)
     prepared = await run_in_threadpool(_prepare, save_id, message)
 
     async def event_gen():

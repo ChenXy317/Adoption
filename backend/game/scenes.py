@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from config import SCENE_MEMORY_IMPORTANCE, SCENE_PROMPT_CHAR_BUDGET, TIME_MAX_JUMP_HOURS
 from game import clock, events
 from game.attributes import apply_effects
-from orm import Memory, Message, Save, SaveFlag, SceneDef, SceneLog
+from orm import EventLog, Memory, Message, Save, SaveFlag, SceneDef, SceneLog
 
 ACTIVE_FLAG = "active_scene"
 
@@ -213,6 +213,36 @@ def _latest_open_log(session: Session, save_id: int, scene_key: str) -> SceneLog
     )
 
 
+def _write_money_log(
+    session: Session, save: Save, scene: SceneDef, changes: list[dict], *, at_abs: int, phase: str
+) -> None:
+    """场景的金钱变动补写 event_logs，使钱包「最近收支」有据可查。"""
+    money_changes = [c for c in changes if c.get("key") == "money"]
+    if not money_changes:
+        return
+    delta = sum(float(c.get("delta") or 0) for c in money_changes)
+    if delta == 0:
+        return
+    label = f"进入场景「{scene.name}」" if phase == "enter" else f"场景「{scene.name}」结算"
+    amount = f"{delta:+.2f}".rstrip("0").rstrip(".")
+    log = EventLog(
+        save_id=save.id,
+        event_id=None,
+        status="triggered",
+        content=f"{label}：金钱 {amount}。",
+        meta={
+            "key": f"scene:{scene.key}",
+            "name": label,
+            "category": "scene",
+            "phase": phase,
+            "attrs": money_changes,
+        },
+        game_minutes_at=at_abs,
+    )
+    session.add(log)
+    session.flush()
+
+
 def enter_scene(
     session: Session,
     save: Save,
@@ -231,6 +261,9 @@ def enter_scene(
         updated, cost_changes = apply_effects(defs_map, values, {"money": -money})
         values.update(updated)
         events.write_changes(session, save.id, values, cost_changes)
+        _write_money_log(
+            session, save, scene, cost_changes, at_abs=ctx.absolute, phase="enter"
+        )
     time_cost = int(_number(cost.get("time_minutes")) or 0)
     time_cost = max(0, min(time_cost, TIME_MAX_JUMP_HOURS * 60))
 
@@ -306,6 +339,9 @@ def finish_scene(
         updated, attr_changes = apply_effects(defs_map, values, effects.get("attrs"))
         values.update(updated)
         events.write_changes(session, save.id, values, attr_changes)
+        _write_money_log(
+            session, save, scene, attr_changes, at_abs=ctx.absolute, phase="finish"
+        )
     flags = effects.get("flags") or {}
     for key, value in flags.items():
         events.set_flag(session, save.id, str(key), value)
@@ -521,7 +557,8 @@ def settle_scenes(
             select(SceneDef).where(SceneDef.key == str(active.get("key") or ""))
         )
         if scene is None or not scene.enabled:
-            clear_active(session, save.id)
+            now_abs = clock.absolute_minutes(save.game_minutes, save.settings or {})
+            abort_scene(session, save.id, scene, active, now_abs=now_abs)
             active = None
     if active:
         is_turn = source == "chat"

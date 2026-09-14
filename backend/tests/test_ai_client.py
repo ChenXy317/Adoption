@@ -36,5 +36,24 @@ class BuildKwargsTest(unittest.TestCase):
         self.assertEqual(kwargs["max_tokens"], 4096)
 
 
+class UnknownParamTest(unittest.TestCase):
+    """关闭思考参数被拒时的识别范围（避免误判普通 400 而重复请求）。"""
+
+    def test_unknown_param_messages(self):
+        self.assertTrue(
+            AIClient._looks_like_unknown_param(Exception("unknown parameter: foo"))
+        )
+        self.assertTrue(
+            AIClient._looks_like_unknown_param(Exception("未知参数 enable_thinking"))
+        )
+
+    def test_regular_invalid_parameter_not_matched(self):
+        self.assertFalse(
+            AIClient._looks_like_unknown_param(
+                Exception("invalid parameter: max_tokens too large")
+            )
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
