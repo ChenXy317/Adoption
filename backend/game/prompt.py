@@ -6,7 +6,11 @@
 """
 from __future__ import annotations
 
-from config import CHAT_HISTORY_MESSAGES, PROMPT_ATTR_CHAR_BUDGET
+from config import (
+    CHAT_HISTORY_MESSAGES,
+    PROMPT_ATTR_CHAR_BUDGET,
+    PROMPT_EVENT_CHAR_BUDGET,
+)
 from game import clock
 from game.attributes import phase_key_of
 from orm import AttributeDef, Character, Message, Save
@@ -112,6 +116,28 @@ def _stage_note(character: Character, phase_key: str, phase_label: str) -> str:
     return f"关系阶段：{phase_label}（{note}）" if note else f"关系阶段：{phase_label}"
 
 
+def _event_block(events: list[dict]) -> str:
+    items: list[str] = []
+    used = 0
+    for event in events:
+        name = str(event.get("name") or "事件").strip()
+        content = str(event.get("content") or "").strip()
+        text = f"【{name}】{content}" if content else ""
+        if not text:
+            continue
+        if used + len(text) > PROMPT_EVENT_CHAR_BUDGET:
+            break
+        items.append(text)
+        used += len(text)
+    if not items:
+        return ""
+    return (
+        "# 当前事件情境\n"
+        "以下是刚刚发生的事件，请结合它自然继续演出，不要在正文中罗列或复述事件标题：\n"
+        + "\n".join(items)
+    )
+
+
 def build_messages(
     save: Save,
     character: Character,
@@ -119,6 +145,7 @@ def build_messages(
     values: dict[str, float],
     history: list[Message],
     settings: dict,
+    active_events: list[dict] | None = None,
 ) -> list[dict]:
     """组装 OpenAI 兼容消息列表（单条 system + 最近消息）。"""
     abs_minutes = clock.absolute_minutes(save.game_minutes, settings)
@@ -141,6 +168,9 @@ def build_messages(
         f"{_stage_note(character, phase_key, phase_label)}\n"
         f"属性：{_attr_line(defs, values)}"
     )
+    event_block = _event_block(active_events or [])
+    if event_block:
+        system_parts.append(event_block)
     content_prompt = (settings or {}).get("content_prompt") or ""
     if content_prompt.strip():
         system_parts.append("# 内容风格（用户自定义）\n" + content_prompt.strip())

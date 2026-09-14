@@ -2,6 +2,7 @@
 SSE 对话 — 流式生成、状态标签剥离与落库结算（PLAN 5.5）。
 
 流式阶段不做 DB 写；DB 访问集中在流前（组装上下文）与流后（结算落库）两端。
+流后结算顺序：AI 属性/时间 → tick → 跨日随机判定 → 事件触发，同一事务提交。
 """
 from __future__ import annotations
 
@@ -16,9 +17,14 @@ from sqlalchemy import select
 from starlette.concurrency import run_in_threadpool
 
 from ai_client import AIClientError, ai
-from config import CHAT_HISTORY_MESSAGES, TIME_DEFAULT_ADVANCE, TIME_MAX_ADVANCE_PER_MESSAGE
+from config import (
+    CHAT_HISTORY_MESSAGES,
+    EVENT_RECENT_WINDOW_MINUTES,
+    TIME_DEFAULT_ADVANCE,
+    TIME_MAX_ADVANCE_PER_MESSAGE,
+)
 from db import SessionLocal
-from game import clock
+from game import clock, events
 from game.attributes import apply_deltas, phase_of
 from game.prompt import build_messages
 from game.tags import StateTagStripper, parse_state
@@ -41,7 +47,7 @@ def sse(event: str, data: dict) -> str:
 
 
 def _prepare(save_id: int, message: str) -> dict:
-    """流前：落用户消息 + 组装 prompt。"""
+    """流前：落用户消息 + 组装 prompt（含当前事件情境）。"""
     session = SessionLocal()
     try:
         save = get_save_or_error(session, save_id)
@@ -51,9 +57,7 @@ def _prepare(save_id: int, message: str) -> dict:
             error("model_not_set", "该存档尚未选择模型，请先在「模型配置」中选择", 400)
         runtime = get_runtime(session, save.model_key)
         character = (
-            session.get(Character, save.character_id)
-            if save.character_id
-            else None
+            session.get(Character, save.character_id) if save.character_id else None
         )
         if character is None:
             from helpers import error
@@ -85,7 +89,12 @@ def _prepare(save_id: int, message: str) -> dict:
             )
         )
         values = load_attr_values(session, save_id)
-        messages = build_messages(save, character, defs, values, history, settings)
+        active_events = events.recent_events(
+            session, save, window_minutes=EVENT_RECENT_WINDOW_MINUTES, limit=3
+        )
+        messages = build_messages(
+            save, character, defs, values, history, settings, active_events
+        )
         return {
             "messages": messages,
             "model_id": runtime["model_id"],
@@ -100,30 +109,26 @@ def _prepare(save_id: int, message: str) -> dict:
 
 
 def _settle(save_id: int, text: str, tag_raw: str, interrupted: bool) -> dict:
-    """流后：解析状态标签 → 应用属性/时间 → 同一事务落 assistant 消息。"""
+    """流后：解析状态标签 → 应用属性/时间 → 事件结算 → 同一事务落库。"""
     session = SessionLocal()
     try:
         save = session.get(Save, save_id)
         settings = save.settings or {}
-        defs = {d.key: d for d in session.scalars(select(AttributeDef))}
+        defs = list(session.scalars(select(AttributeDef)))
+        defs_map = {d.key: d for d in defs}
         values = load_attr_values(session, save_id)
+        old_game = int(save.game_minutes)
         state = parse_state(tag_raw)
         changes: list[dict] = []
-        phase_label: str | None = None
         time_advance = 0
         if state is not None:
-            new_values, changes = apply_deltas(
-                defs, values, state.get("attrs") or {}
-            )
-            phase_label = phase_of(new_values)
-            for key, value in new_values.items():
-                if values.get(key) == value:
-                    continue
-                row = session.get(AttributeValue, (save_id, key))
+            updated, changes = apply_deltas(defs_map, values, state.get("attrs") or {})
+            values.update(updated)
+            for change in changes:
+                row = session.get(AttributeValue, (save_id, change["key"]))
                 if row is not None:
-                    row.value = value
-            time_part = state.get("time") or {}
-            raw_advance = time_part.get("advance_minutes")
+                    row.value = change["new"]
+            raw_advance = (state.get("time") or {}).get("advance_minutes")
             if raw_advance is None:
                 time_advance = TIME_DEFAULT_ADVANCE
             else:
@@ -134,15 +139,8 @@ def _settle(save_id: int, text: str, tag_raw: str, interrupted: bool) -> dict:
         else:
             time_advance = TIME_DEFAULT_ADVANCE
         time_advance = max(0, min(int(time_advance), TIME_MAX_ADVANCE_PER_MESSAGE))
-        save.game_minutes += time_advance
 
-        abs_minutes = clock.absolute_minutes(save.game_minutes, settings)
-        virtual = {
-            "absolute_minutes": abs_minutes,
-            **clock.split(abs_minutes),
-            "label": clock.time_label(abs_minutes),
-        }
-
+        abs_before = clock.absolute_minutes(old_game, settings)
         meta: dict = {"attrs": changes, "time_advance": time_advance}
         if interrupted:
             meta["interrupted"] = True
@@ -156,19 +154,60 @@ def _settle(save_id: int, text: str, tag_raw: str, interrupted: bool) -> dict:
                 role="assistant",
                 content=text,
                 meta=meta,
-                game_minutes_at=abs_minutes,
+                game_minutes_at=abs_before,
             )
             session.add(assistant)
+            session.flush()
+
+        settled = events.settle_time(
+            session,
+            save,
+            defs,
+            values,
+            old_game + time_advance,
+            source="chat",
+        )
+        total_advance = int(save.game_minutes) - old_game
+        meta["ticks"] = settled["tick_changes"]
+        if settled["triggered"]:
+            meta["events"] = [item["key"] for item in settled["triggered"]]
+        if assistant is not None:
+            assistant.game_minutes_at = settled["absolute_minutes"]
         session.commit()
+
+        abs_minutes = clock.absolute_minutes(save.game_minutes, settings)
+        virtual = {
+            "absolute_minutes": abs_minutes,
+            **clock.split(abs_minutes),
+            "label": clock.time_label(abs_minutes),
+        }
+        combined = (
+            changes
+            + settled["tick_changes"]
+            + [c for item in settled["triggered"] for c in item["attrs"]]
+        )
         return {
             "message_id": assistant.id if assistant else None,
-            "changes": changes,
-            "phase": phase_label,
-            "time_advance": time_advance,
+            "changes": combined,
+            "ai_changes": changes,
+            "phase": phase_of(values),
+            "time_advance": total_advance,
             "game_minutes": save.game_minutes,
             "virtual": virtual,
             "parsed": state is not None,
             "interrupted": interrupted,
+            "events": [
+                {
+                    "key": item["key"],
+                    "name": item["name"],
+                    "category": item["category"],
+                    "content": item["content"],
+                    "message_id": item["message_id"],
+                    "advance_minutes": item["advance_minutes"],
+                }
+                for item in settled["triggered"]
+            ],
+            "messages": settled["messages"],
         }
     finally:
         session.close()
@@ -242,6 +281,14 @@ async def chat(save_id: int, req: ChatIn):
                     "virtual_label": settled["virtual"]["label"],
                 },
             )
+        if settled["events"] or settled["messages"]:
+            yield sse(
+                "event_triggered",
+                {
+                    "events": settled["events"],
+                    "messages": settled["messages"],
+                },
+            )
         yield sse(
             "time_update",
             {
@@ -259,7 +306,7 @@ async def chat(save_id: int, req: ChatIn):
                 {
                     "message_id": settled["message_id"],
                     "meta": {
-                        "attrs": settled["changes"],
+                        "attrs": settled["ai_changes"],
                         "time_advance": settled["time_advance"],
                     },
                     "game_minutes": settled["game_minutes"],

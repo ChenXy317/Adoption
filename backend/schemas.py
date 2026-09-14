@@ -41,6 +41,14 @@ class ChatIn(BaseModel):
     message: str = Field(min_length=1, max_length=20000)
 
 
+class AdvanceIn(BaseModel):
+    """显式推进时间：minutes 增量 / period 跳到下一时段 / target 跳到指定虚拟时刻。"""
+
+    minutes: int | None = Field(default=None, ge=1, le=100000)
+    period: str | None = Field(default=None, max_length=32)
+    target: dict | None = None
+
+
 class AttributeDefIn(BaseModel):
     key: str = Field(min_length=1, max_length=64, pattern=r"^[a-z][a-z0-9_]{0,63}$")
     name: str = Field(min_length=1, max_length=64)

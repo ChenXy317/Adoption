@@ -20,6 +20,13 @@ export const useChatStore = defineStore("chat", {
       const data = await apiGet(`/api/saves/${saveId}/messages?limit=200`);
       this.messages = data.messages;
     },
+    pushMessages(list) {
+      for (const message of list || []) {
+        if (!message || message.id == null) continue;
+        if (this.messages.some((m) => m.id === message.id)) continue;
+        this.messages.push(message);
+      }
+    },
     cancel() {
       if (activeController) activeController.abort();
     },
@@ -53,6 +60,7 @@ export const useChatStore = defineStore("chat", {
       let settled = false;
       let failed = false;
       let hadText = false;
+      let eventTriggered = false;
       try {
         await streamChat(
           saveId,
@@ -63,6 +71,10 @@ export const useChatStore = defineStore("chat", {
             },
             state_update: (data) => {
               game.applyAttrs(data.attrs, data.phase);
+            },
+            event_triggered: (data) => {
+              eventTriggered = true;
+              this.pushMessages(data.messages);
             },
             time_update: (data) => {
               game.applyTime(data);
@@ -97,6 +109,9 @@ export const useChatStore = defineStore("chat", {
         this.streaming = false;
         hadText = Boolean(assistant.content.trim());
         if (failed && !hadText) this._dropMessage(assistant);
+        if (eventTriggered) {
+          game.loadState(saveId).catch(() => {});
+        }
       }
       return settled || hadText;
     },

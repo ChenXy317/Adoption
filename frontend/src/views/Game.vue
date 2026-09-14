@@ -33,6 +33,16 @@
           <div class="dim small">打工 / 送礼 / 消费将在后续版本开放</div>
         </section>
 
+        <AdvancePanel :save-id="$route.params.id" @advanced="onSettled" />
+
+        <ActionPanel
+          :save-id="$route.params.id"
+          :items="game.current?.manual_events || []"
+          @triggered="onSettled"
+        />
+
+        <EventPanel :events="game.current?.recent_events || []" />
+
         <section class="card panel">
           <h3>当前场景</h3>
           <div class="dim small">
@@ -50,8 +60,11 @@
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
+import ActionPanel from "../components/ActionPanel.vue";
+import AdvancePanel from "../components/AdvancePanel.vue";
 import ChatInput from "../components/ChatInput.vue";
 import ChatStream from "../components/ChatStream.vue";
+import EventPanel from "../components/EventPanel.vue";
 import ModelCatalogModal from "../components/ModelCatalogModal.vue";
 import StatusBars from "../components/StatusBars.vue";
 import { useChatStore } from "../stores/chat";
@@ -104,6 +117,11 @@ async function refresh() {
   } catch {
     /* 忽略刷新失败 */
   }
+}
+
+async function onSettled(data) {
+  chat.pushMessages(data?.messages);
+  await refresh();
 }
 
 async function onCatalogClose() {

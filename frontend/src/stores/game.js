@@ -33,6 +33,12 @@ export const useGameStore = defineStore("game", {
     async loadState(id) {
       this.current = await apiGet(`/api/saves/${id}/state`);
     },
+    async advance(id, payload) {
+      return apiPost(`/api/saves/${id}/advance`, payload);
+    },
+    async triggerManual(id, key) {
+      return apiPost(`/api/saves/${id}/events/${encodeURIComponent(key)}/trigger`);
+    },
     applyAttrs(changes, phase = null) {
       if (!this.current) return;
       for (const change of changes || []) {

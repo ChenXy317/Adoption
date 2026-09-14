@@ -1,6 +1,6 @@
 /**
  * SSE 流读取 — POST 对话并按事件分发。
- * handlers: { chunk, state_update, time_update, done, error }
+ * handlers: { chunk, state_update, event_triggered, time_update, done, error }
  */
 export async function streamChat(saveId, message, handlers = {}, signal) {
   const res = await fetch(`/api/saves/${saveId}/chat`, {

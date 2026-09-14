@@ -1,6 +1,6 @@
 # STATUS — 当前状态记录
 
-> 更新时间：2026-09-14（M2 完成、全量审查修复完成、M3 未开工）
+> 更新时间：2026-09-14（M3 事件与时间完成、全链路验证通过、未提交）
 > 用途：跨会话交接。新会话先读 `PLAN.md`（唯一真相源）+ 本文件，再动手。
 
 ## 一、项目速览
@@ -15,8 +15,9 @@
 | 里程碑 | 状态 |
 |---|---|
 | M1 骨架（建表+种子、存档 CRUD、模型目录、SSE 对话、Vue 基础界面） | 已完成，已提交 `44c7425` |
-| M2 女主角刻画（内置设定书、prompt 深度注入、属性管理接口） | 已完成，**未提交**（见第五节） |
-| M3 事件与时间（三类事件、随机每日判定、推进面板、事件种子） | 未开工（下一步，见第七节） |
+| M2 女主角刻画（内置设定书、prompt 深度注入、属性管理接口） | 已完成，已提交 `890a3bd` |
+| M3 事件与时间（虚拟时钟结算、三类事件、推进面板、事件种子） | **已完成，未提交**（见第五节） |
+| M3.5 多轮场景 | 未开工（下一步，见第七节） |
 
 ## 三、运行方式
 
@@ -25,63 +26,82 @@
 - 服务端口：**18730**（`APP_PORT` 可配）；启动后浏览器开 `http://127.0.0.1:18730`
 - 启动：双击 `快速启动.bat`（缺 dist 会自动构建）；或手动：
   `cd backend; .venv\Scripts\python.exe main.py`
-- 测试：`cd backend; .venv\Scripts\python.exe -m unittest discover -s tests`（21 项）
+- 测试：`cd backend; .venv\Scripts\python.exe -m unittest discover -s tests`（**46 项**）
 - 前端：改动后 `cd frontend; npm run build`（后端托管 dist）；开发模式 `npm run dev`（Vite 代理 18730）
 
 ## 四、数据现状（库内）
 
-- 女主角：**小澄**（19 岁，你收留的女孩）——内置设定书 `backend/seeds/character.json`，启动时装载并以种子为准覆盖库记录；界面不暴露编辑
-- 存档：仅 `id=6「雨夜」`（6 条消息，模型 `aihubmix:xiaomi-mimo-v2.5-free`）；其余测试档已清理
-- 供应商（均为 `use_env_key` 模式，库内无明文密钥）：
-  - `aihubmix` → `xiaomi-mimo-v2.5-free`（实测可用，环境变量 `AIHUBMIX_API_KEY`）
-  - `openrouter` → `nvidia/nemotron-3-ultra-550b-a55b:free`（免费额度 50 次/天，每日 08:00 重置；环境变量 `OPENROUTER_API_KEY`）
-- 属性定义：库内 8 条（affection/trust/mood/stamina/intimacy/dependence/vigilance/money）；**stamina 已停用**；money `ai_editable=false`、max 999999999；代码种子 `seeds/attributes.json` 现为 7 条（不含 stamina，库内旧行为停用状态）
-- 其它密钥在系统环境变量：`DEEPSEEK_API_KEY`、`OLLAMA_API_KEY`（deepseek-chat 已弃用；Ollama Cloud 直连超时未采用）
+- 女主角：**小澄**（19 岁）——内置设定书 `backend/seeds/character.json`，启动装载并以种子为准覆盖
+- 存档：仅 `id=6「雨夜」`（6 条消息，`aihubmix:xiaomi-mimo-v2.5-free`）；M3 自检档均已清理
+- 事件定义：`backend/seeds/events.json` 共 **18 条**，启动装载（种子为准覆盖同 key）：
+  - 主线 fixed（flag 串联，once）：第一个早晨 → 噩梦 → 手腕上的疤 → 不会送你走
+  - 阶段 fixed（once）：改口叫名字、第一次开口要东西、想要一个拥抱
+  - random（每日判定，带 chance/冷却）：午后的雨、楼下的猫、等你回家、说梦话、偷偷学的菜、偷偷缝好的衣服
+  - manual（行动菜单，带 cost）：傍晚散步、一起煮火锅、帮她整理头发、带她买连衣裙、陪她逛书店
+- 属性 tick 已生效：mood `regress`（回归 50，0.5/时）、vigilance `decay`（1/时）
+- 供应商同前：`aihubmix` / `openrouter`（均 `use_env_key`，库内无明文密钥）
 
-## 五、未提交变更（含审查修复，数量见 git status）
+## 五、未提交变更（M3，相对 `890a3bd`）
 
-功能块概览（相对 `44c7425`）：
+**后端**
+- `game/events.py`（新）：条件求值器（`all/any/not` + `attr/flag/game_day/period/date/since_event` + 根级 `chance`）；可用性（启用/once/冷却/条件）；`settle_time` 统一结算（tick → 跨日随机判定 → fixed/random 触发 → 效果应用，最多 4 轮、单次最多 3 个事件）
+- `game/clock.py`：`day_index` / `game_day_of` / `day_starts_between`（跨日检测）/ `next_period_start`
+- `game/attributes.py`：`apply_ticks`（decay/recover/regress）、`apply_effects`（事件效果，可改金钱、无单次上限）
+- `routes/advance.py`（新）：`POST /api/saves/{id}/advance`（minutes / period / target 三种方式，+1 天=1440 上限，目标跳最多 60 天）、`GET /api/saves/{id}/clock`
+- `routes/events.py`（新）：`GET /api/saves/{id}/events`（历史）、`POST /api/saves/{id}/events/{key}/trigger`（manual：条件+金钱校验 → 扣钱/耗时 → 落库）
+- `routes/chat.py`：流后走 `settle_time`；SSE 新增 `event_triggered`；prompt 注入「当前事件情境」（180 虚拟分钟窗口、最多 3 条）
+- `routes/state.py`：`recent_events`（最近 5 条）、`manual_events`（可用性+原因）
+- `seeds/loader.py` + `seeds/events.json`：事件种子装载
+- `schemas.py`：`AdvanceIn`
+- 配置：`EVENT_MAX_PER_SETTLEMENT=3`、`EVENT_RECENT_WINDOW_MINUTES=180`
 
-- **M2 后端**：characters 全局化 + 旧库自动迁移（`db.py`）、`/api/character` 只读路由、属性定义 CRUD（界面不暴露）、prompt 深度注入（设定书全字段+阶段描述+参考台词）、属性数值 FLOAT→DOUBLE 迁移
-- **内置设定书**：`seeds/character.json`（小澄完整设计）+ 启动装载；删除 `seeds/templates.json` 与模板接口
-- **工程**：端口 18730、日志写 `backend/server.log`、SPA 路由回退、.env 增加 APP_HOST/APP_PORT
-- **前端**：移除设定书编辑器/属性管理面板/模板交互；存档创建改为内置女主摘要；Game 显示关系阶段
-- **全量审查修复（2026-09-14）**：模型改名/删除引用校验改为精确 key（供应商仍按前缀）、UI 关系阶段随对话刷新、SSE `time_update` 携带完整 virtual、中文输入法回车不误发送、空白存档名拦截、`tick_rule` 可置空、空正文不落库、重试重置思考链剥离器、流中止支持（切换页面自动取消）、`MYSQL_PASSWORD` 校验后移到 `db.py`（单测不再依赖该变量）
-- **文档**：PLAN.md（单女主/内置设定书/三类事件等）、README.md
+**前端**
+- `AdvancePanel.vue`（+10分/+1时/+1天/跳到时段）、`ActionPanel.vue`（互动列表：cost、可用性、冷却/条件/金钱不足提示）、`EventPanel.vue`（最近事件）
+- `stores/chat.js`：处理 `event_triggered`（追加事件消息并在流后刷新状态）
+- `stores/game.js`：`advance` / `triggerManual`；`Game.vue` 右栏接入三个面板
 
-> 建议：下次开工前先提交这批变更（提交信息按 AGENTS.md 用泛化描述）。
+**测试**：21 → **46 项**（`tests/test_events.py` 新增；tick/效果/时钟扩展补进 `test_game.py`）
 
-## 六、关键决策速查（详见 PLAN 第 10 节）
+## 六、M3 验证记录（2026-09-14）
 
-- 单女主全局唯一（`characters` 与存档解耦）；存档 = 从头来过的周目
-- 设定书与属性定义均为内置内容，游戏界面不暴露编辑；**模型配置保留**（配密钥必需）
-- 事件三类：`random` 随机（每游戏日开始时判定一次，结果记 `save_flags`）/ `fixed` 固定（属性/flag 阈值）/ `manual` 手动（行动菜单主动选择，带 cost）；剧情链用 flag 串联；时段/日期/节日是条件不是类型
-- 不做换装（文字描述）、不做体力/健康/伤病机制（纯数值属性）、内容默认无限制
-- 时间与现实隔离（纯虚拟时钟）；`game/` 纯函数层配最小单测
+- `unittest` 46 项全过
+- httpx 端到端（临时档，已清理）：推进 60m 触发「第一个早晨」+ tick 正确；剧情链按序触发（d3 深夜噩梦 → 疤 → 约定），once 不重复；随机判定 12 游戏日命中多个且**同日不重复**；manual 冷却/条件/花钱校验与扣款正确
+- 真实模型 SSE（aihubmix `xiaomi-mimo-v2.5-free`）：事件情境进入 prompt，回复围绕事件演出；`state_update/event_triggered/time_update/done` 顺序正常
+- 浏览器实测：新建档 → 推进面板 +10 分（事件上屏、属性/时间实时更新）→ 散步（冷却按钮变灰）
 
-## 七、下一步 M3（事件与时间）建议顺序
+## 七、关键决策速查（M3 实现口径）
 
-1. `game/events.py`：条件求值器（`period`/`date`/`game_day`/`attr`/`flag`，复用 PLAN 5.3 的 JSON 结构）
-2. `game/clock.py` 扩展：跨日检测、时段边界工具
-3. 三类触发：随机（跨日判定 + `save_flags` 防重复 + 冷却/once）、固定（阈值）、手动（cost 校验）
-4. 事件注入对话：写 `event_logs` + `role=event` 消息 + prompt 情境块；SSE 增加 `event_triggered`
-5. `/api/saves/{id}/advance` + 调试推进面板（+10m/+1h/+1d/跳时刻）
-6. 为小澄写事件种子：每阶段 2–3 个 + 主线链「雨夜→噩梦→坦白→和解」
-7. 单测：条件求值、跨日判定、冷却/once、钳制边界
+- **随机事件**：每游戏日**零点**判定一次（判定时忽略时段/日期条件），结果记 `save_flags.random_rolls = {key:{day,hit}}`；命中后当天满足全部条件（含时段）即注入，同日不重复
+- **固定事件**：每次结算评估；种子均 `once=true`。注意：自定义 fixed 若不带 once/cooldown，会每次结算重复触发
+- **手动事件**：条件/once/冷却 + 金钱余额校验；`cost.money` 直接扣，`cost.time_minutes` 作为额外推进走统一结算
+- **效果 JSON**：`attrs`（无视 ai_editable，可改钱）/ `advance_minutes`（单次上限 24h）/ `flags` / `unlock_events`（写 `event_unlocked:<key>` flag）
+- **事件落库**：`event_logs` + `role=event` 消息 + prompt 情境块；SSE `event_triggered` 携带消息体
+- **大跳兜底**：跳过多日时中间日期只做随机判定、不注入（仅当日命中注入）；单次结算最多 4 轮/3 事件防循环
 
-## 八、环境坑与约定（踩过的雷）
+## 八、下一步 M3.5（多轮场景）建议顺序（PLAN 5.3 / 里程碑）
 
-- 服务控制台窗口**不能关**（关 = 停服）；`pythonw.exe` 启动不监听（已放弃）；请用 `快速启动.bat`（独立窗口）
-- PowerShell 5.1 调 API：`Invoke-RestMethod` 中文 JSON 会乱码——接口测试统一用 `backend/.venv` 的 python + httpx
-- mysql CLI：`key` 是保留字需反引号；该实例 `ANSI_QUOTES` 开启，字符串必须单引号（双引号会被当标识符）
-- SQLAlchemy pin ≥2.0.41（Py3.14）；属性数值列用 `Double`（`Float` 丢精度）
-- 流式阶段不写 DB（会话在流前/流后两端）；状态标签解析失败留痕 `meta.tag_debug`
-- codebase-memory 图谱**未索引**本项目（需要时可 `index_repository`）
-- 交流用中文；提交信息用泛化描述（AGENTS.md）
+1. `game/scenes.py`：进入/持续/结束/结算；`save_flags.active_scene` 生命周期（同时仅 1 个）
+2. STATE 标签扩展 `"scene":{"action":"end","summary":...}`；min_turns 内拒绝提前收尾；max_turns 注入收尾指令
+3. `/api/saves/{id}/scenes`（历史/调试进入）、`/scenes/end`（手动收尾）；effects 支持 `start_scene`
+4. 前端 `SceneBanner`（名称/轮数/目标/结束）；场景种子 2–3 个（约会/照顾生病等）
+5. 场景结束写入场景记忆（kind=event/relationship，M4 前可先落 `memories` 占位）
+6. 单测：进入条件复用事件求值器、轮数边界、结算 flags/attrs
 
-## 九、给下一个会话的建议
+## 九、环境坑与约定（踩过的雷）
 
-- 动手前：读 `PLAN.md` + 本文件 → 启动服务确认 18730 可用 → `git status` 看未提交变更
+- 服务控制台窗口**不能关**（关 = 停服）；请用 `快速启动.bat`（独立窗口）
+- PowerShell 5.1 调 API 中文会乱码——接口测试统一用 `backend/.venv` 的 python + httpx，并设 `PYTHONIOENCODING=utf-8`
+- mysql CLI：`key` 是保留字需反引号；该实例 `ANSI_QUOTES` 开启，字符串必须单引号
+- SQLAlchemy pin ≥2.0.41（Py3.14）；属性数值列用 `Double`
+- `SessionLocal` 为 `autoflush=False`：手动改 ORM 行后、依赖查询前需先 flush
+- 流式阶段不写 DB；状态标签解析失败留痕 `meta.tag_debug`
+- codebase-memory 图谱**已索引**本项目（项目名 `new-idea`，530+ 节点）
+- 交流用中文；提交信息用泛化描述（AGENTS.md）；提交前建议先跑单测
+
+## 十、给下一个会话的建议
+
+- 动手前：读 `PLAN.md` + 本文件 → `git status`（M3 未提交）→ 可先提交 M3 再开工 M3.5
 - 后端改动需重启服务（未开 reload）；前端改动需 `npm run build`
 - 验证习惯：先 `unittest` → 再 httpx 端到端（含 SSE）→ 最后浏览器实测
 - 聊天验证注意选可用模型（aihubmix 的 `xiaomi-mimo-v2.5-free`），OpenRouter 免费额度可能已用尽
+- 事件平衡数据（打工收益、礼物价格、冷落参数）仍待定，PLAN 第 10 节要求 **M3 结束前定稿**——M3.5 开工前建议先补

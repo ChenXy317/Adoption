@@ -46,6 +46,45 @@ def absolute_minutes(game_minutes: int, settings: dict | None) -> int:
     return start_offset(settings) + int(game_minutes)
 
 
+def day_index(abs_minutes: int) -> int:
+    """绝对虚拟分钟所属的日历日序号（自虚拟年 1 月 1 日起算）。"""
+    return int(abs_minutes) // DAY_MINUTES
+
+
+def game_day_of(game_minutes: int, settings: dict | None = None) -> int:
+    """开局当天为第 1 天；跨过午夜进入下一天。"""
+    base = start_offset(settings)
+    return (base + max(0, int(game_minutes))) // DAY_MINUTES - base // DAY_MINUTES + 1
+
+
+def day_starts_between(from_abs: int, to_abs: int, *, max_days: int = 90) -> list[int]:
+    """返回 (from_abs, to_abs] 内每个午夜的绝对分钟，用于跨日判定。"""
+    if to_abs <= from_abs:
+        return []
+    first = (int(from_abs) // DAY_MINUTES + 1) * DAY_MINUTES
+    starts: list[int] = []
+    moment = first
+    while moment <= to_abs and len(starts) < max_days:
+        starts.append(moment)
+        moment += DAY_MINUTES
+    return starts
+
+
+def period_keys() -> list[str]:
+    return [key for _, key, _ in _PERIOD_TABLE]
+
+
+def next_period_start(abs_minutes: int, period_key: str) -> int | None:
+    """下一个指定时段的开始时刻；当前正处于该时段时跳到次日。"""
+    start = {key: begin for begin, key, _ in _PERIOD_TABLE}.get(period_key)
+    if start is None:
+        return None
+    candidate = (int(abs_minutes) // DAY_MINUTES) * DAY_MINUTES + start
+    if candidate <= abs_minutes:
+        candidate += DAY_MINUTES
+    return candidate
+
+
 def period_of(minute_of_day: int) -> tuple[str, str]:
     """日内分钟 → (时段 key, 时段名)。"""
     m = minute_of_day % DAY_MINUTES

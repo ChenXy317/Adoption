@@ -2,8 +2,20 @@
 import unittest
 
 from game import clock
-from game.attributes import apply_deltas, clamp, phase_key_of, phase_of
-from game.prompt import _persona_block, _sample_lines_block, _stage_note
+from game.attributes import (
+    apply_deltas,
+    apply_effects,
+    apply_ticks,
+    clamp,
+    phase_key_of,
+    phase_of,
+)
+from game.prompt import (
+    _event_block,
+    _persona_block,
+    _sample_lines_block,
+    _stage_note,
+)
 from game.tags import StateTagStripper, parse_state
 from orm import AttributeDef, Character
 
@@ -94,6 +106,37 @@ class AttributesTest(unittest.TestCase):
     def test_phase_of(self):
         self.assertEqual(phase_of({"affection": 95, "trust": 95, "dependence": 95}), "依恋")
         self.assertEqual(phase_of({"affection": 0, "trust": 0, "dependence": 0}), "陌生")
+
+    def test_apply_effects_allows_money(self):
+        defs = {
+            "money": make_def("money", "金钱", lo=0, hi=10**9, default=2000, ai_editable=False)
+        }
+        new_values, changes = apply_effects(defs, {"money": 2000.0}, {"money": -80})
+        self.assertEqual(new_values["money"], 1920.0)
+        self.assertEqual(changes[0]["key"], "money")
+
+    def test_apply_ticks_decay(self):
+        defs = {"vigilance": make_def("vigilance", "警戒", default=30)}
+        defs["vigilance"].tick_rule = {"mode": "decay", "amount_per_hour": 1}
+        new_values, changes = apply_ticks(defs, {"vigilance": 30.0}, 5)
+        self.assertEqual(new_values["vigilance"], 25.0)
+        self.assertEqual(changes[0]["source"], "tick")
+
+    def test_apply_ticks_regress_no_overshoot(self):
+        defs = {"mood": make_def("mood", "心情", default=60)}
+        defs["mood"].tick_rule = {"mode": "regress", "target": 50, "rate_per_hour": 0.5}
+        new_values, _ = apply_ticks(defs, {"mood": 60.0}, 100)
+        self.assertEqual(new_values["mood"], 50.0)
+        new_values, _ = apply_ticks(defs, {"mood": 55.0}, 2)
+        self.assertEqual(new_values["mood"], 54.0)
+
+    def test_apply_ticks_recover_and_limits(self):
+        defs = {"stamina": make_def("stamina", "体力", default=0, hi=10)}
+        defs["stamina"].tick_rule = {"mode": "recover", "amount_per_hour": 2}
+        new_values, _ = apply_ticks(defs, {"stamina": 9.0}, 3)
+        self.assertEqual(new_values["stamina"], 10.0)
+        self.assertEqual(apply_ticks({}, {}, 5), ({}, []))
+        self.assertEqual(apply_ticks(defs, {"stamina": 5.0}, 0)[0]["stamina"], 5.0)
 
 
 class TagsTest(unittest.TestCase):
@@ -186,6 +229,16 @@ class PromptTest(unittest.TestCase):
         block = _sample_lines_block(self.make_character())
         self.assertIn("……嗯。", block)
         self.assertIn("不要照抄", block)
+
+    def test_event_block(self):
+        block = _event_block([
+            {"name": "噩梦", "content": "她在夜里惊醒。"},
+            {"name": "空事件", "content": ""},
+        ])
+        self.assertIn("当前事件情境", block)
+        self.assertIn("【噩梦】她在夜里惊醒。", block)
+        self.assertNotIn("空事件", block)
+        self.assertEqual(_event_block([]), "")
 
 
 if __name__ == "__main__":

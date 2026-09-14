@@ -63,6 +63,10 @@ CALENDAR_DEFAULT = {"month": 5, "day": 1, "hour": 8, "minute": 0}
 # ── 属性 ──
 ATTR_MAX_DELTA_PER_MESSAGE = 20  # 单轮状态标签对单个属性的变化上限
 
+# ── 事件（详见 PLAN 5.3）──
+EVENT_MAX_PER_SETTLEMENT = 3       # 单次结算最多注入的事件数
+EVENT_RECENT_WINDOW_MINUTES = 180  # 事件情境注入 prompt 的有效窗口（虚拟分钟）
+
 # ── 对话与记忆（M4 起逐步启用）──
 CHAT_HISTORY_MESSAGES = 30      # 组装 prompt 的最近消息条数
 MEMORY_TRIGGER_TURNS = 20       # 未总结消息达到该数量触发总结

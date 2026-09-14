@@ -41,30 +41,29 @@ def phase_key_of(values: dict[str, float]) -> tuple[str, str]:
     return PHASE_KEYS.get(label, "stranger"), label
 
 
-def apply_deltas(
+def _apply_values(
     defs_map: dict[str, AttributeDef],
     values: dict[str, float],
     deltas: dict | None,
     *,
-    max_delta: float = ATTR_MAX_DELTA_PER_MESSAGE,
+    max_delta: float | None,
+    respect_ai: bool,
 ) -> tuple[dict[str, float], list[dict]]:
-    """应用 AI 状态标签的属性变化。
-
-    - 只接受已定义、启用且 ai_editable 的属性（金钱等不可被 AI 改动）
-    - 单轮变化先钳制到 ±max_delta，再钳制到属性的 [min, max]
-    返回 (新值字典, 变化明细列表)。
-    """
+    """按定义应用属性变化；respect_ai 时跳过 AI 不可改的属性。"""
     new_values = dict(values)
     changes: list[dict] = []
     for key, raw_delta in (deltas or {}).items():
         definition = defs_map.get(key)
-        if definition is None or not definition.enabled or not definition.ai_editable:
+        if definition is None or not definition.enabled:
+            continue
+        if respect_ai and not definition.ai_editable:
             continue
         try:
             delta = float(raw_delta)
         except (TypeError, ValueError):
             continue
-        delta = clamp(delta, -max_delta, max_delta)
+        if max_delta is not None:
+            delta = clamp(delta, -max_delta, max_delta)
         if delta == 0:
             continue
         old = float(new_values.get(key, definition.default_value))
@@ -78,5 +77,71 @@ def apply_deltas(
             "old": old,
             "new": new,
             "delta": new - old,
+        })
+    return new_values, changes
+
+
+def apply_deltas(
+    defs_map: dict[str, AttributeDef],
+    values: dict[str, float],
+    deltas: dict | None,
+    *,
+    max_delta: float | None = ATTR_MAX_DELTA_PER_MESSAGE,
+) -> tuple[dict[str, float], list[dict]]:
+    """应用 AI 状态标签的属性变化（跳过 ai_editable=false 的属性）。"""
+    return _apply_values(defs_map, values, deltas, max_delta=max_delta, respect_ai=True)
+
+
+def apply_effects(
+    defs_map: dict[str, AttributeDef],
+    values: dict[str, float],
+    deltas: dict | None,
+    *,
+    max_delta: float | None = None,
+) -> tuple[dict[str, float], list[dict]]:
+    """应用事件/动作效果的属性变化（可改金钱，默认不设单次上限）。"""
+    return _apply_values(defs_map, values, deltas, max_delta=max_delta, respect_ai=False)
+
+
+def apply_ticks(
+    defs_map: dict[str, AttributeDef],
+    values: dict[str, float],
+    game_hours: float,
+) -> tuple[dict[str, float], list[dict]]:
+    """按游戏小时结算 tick 规则：decay 衰减 / recover 恢复 / regress 回归中值。"""
+    if game_hours <= 0:
+        return dict(values), []
+    new_values = dict(values)
+    changes: list[dict] = []
+    for key, definition in defs_map.items():
+        rule = definition.tick_rule or {}
+        if not definition.enabled or not isinstance(rule, dict):
+            continue
+        mode = str(rule.get("mode") or "").strip()
+        old = float(new_values.get(key, definition.default_value))
+        new = old
+        if mode == "decay":
+            amount = float(rule.get("amount_per_hour") or 0.0)
+            new = old - amount * game_hours
+        elif mode == "recover":
+            amount = float(rule.get("amount_per_hour") or 0.0)
+            new = old + amount * game_hours
+        elif mode == "regress":
+            target = float(rule.get("target") or 0.0)
+            rate = float(rule.get("rate_per_hour") or 0.0) * game_hours
+            new = old + clamp(target - old, -rate, rate)
+        else:
+            continue
+        new = clamp(new, definition.min, definition.max)
+        if abs(new - old) < 1e-9:
+            continue
+        new_values[key] = new
+        changes.append({
+            "key": key,
+            "name": definition.name,
+            "old": old,
+            "new": new,
+            "delta": new - old,
+            "source": "tick",
         })
     return new_values, changes

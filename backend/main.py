@@ -18,13 +18,15 @@ from fastapi.staticfiles import StaticFiles
 from ai_client import ai
 from config import ALLOWED_ORIGINS, APP_HOST, APP_PORT, BASE_DIR, FRONTEND_DIR
 from db import SessionLocal, init_db
+from routes.advance import router as advance_router
 from routes.catalog import router as catalog_router
 from routes.character import router as character_router
 from routes.chat import router as chat_router
 from routes.defs import router as defs_router
+from routes.events import router as events_router
 from routes.saves import router as saves_router
 from routes.state import router as state_router
-from seeds.loader import apply_character_seed, apply_seeds
+from seeds.loader import apply_character_seed, apply_event_seeds, apply_seeds
 
 def _setup_logging() -> None:
     """日志始终写文件；有控制台（非 pythonw）时同时输出到 stderr。"""
@@ -52,6 +54,7 @@ async def lifespan(app: FastAPI):
     try:
         apply_seeds(session)
         apply_character_seed(session)
+        apply_event_seeds(session)
     finally:
         session.close()
     logger.info("服务初始化完成")
@@ -76,6 +79,8 @@ app.include_router(chat_router)
 app.include_router(state_router)
 app.include_router(defs_router)
 app.include_router(catalog_router)
+app.include_router(advance_router)
+app.include_router(events_router)
 
 
 @app.exception_handler(HTTPException)

@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from config import SEEDS_DIR
-from orm import AttributeDef, Character, Save
+from orm import AttributeDef, Character, EventDef, Save
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +49,51 @@ def apply_seeds(session: Session) -> None:
     if added:
         session.commit()
         logger.info("已写入 %d 条默认属性定义", added)
+
+
+def apply_event_seeds(session: Session) -> None:
+    """装载内置事件定义（seeds/events.json 为准，覆盖同名事件的字段）。
+
+    已存在的自定义事件不被删除；种子中移除的事件保持库内原样，便于临时调试。
+    """
+    path = SEEDS_DIR / "events.json"
+    if not path.exists():
+        logger.warning("未找到事件种子文件: %s", path)
+        return
+    with open(path, encoding="utf-8") as f:
+        items = json.load(f)
+    existing = {
+        row.key: row for row in session.scalars(select(EventDef))
+    }
+    added = updated = 0
+    for item in items:
+        key = (item.get("key") or "").strip()
+        if not key:
+            continue
+        fields = {
+            "name": item.get("name") or key,
+            "category": item.get("category", "fixed"),
+            "trigger": item.get("trigger") or {},
+            "cost": item.get("cost") or {},
+            "effects": item.get("effects") or {},
+            "prompt_template": item.get("prompt_template") or "",
+            "once": bool(item.get("once", False)),
+            "cooldown_minutes": int(item.get("cooldown_minutes", 0) or 0),
+            "priority": int(item.get("priority", 0) or 0),
+            "enabled": bool(item.get("enabled", True)),
+        }
+        definition = existing.get(key)
+        if definition is None:
+            session.add(EventDef(key=key, **fields))
+            added += 1
+            continue
+        if any(getattr(definition, name) != value for name, value in fields.items()):
+            for name, value in fields.items():
+                setattr(definition, name, value)
+            updated += 1
+    if added or updated:
+        session.commit()
+        logger.info("事件种子装载完成：新增 %d 条，更新 %d 条", added, updated)
 
 
 def apply_character_seed(session: Session) -> None:

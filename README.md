@@ -15,9 +15,9 @@
 ```
 backend/
   main.py config.py db.py orm.py schemas.py helpers.py ai_client.py
-  game/     clock.py tags.py attributes.py prompt.py
-  routes/   saves.py chat.py state.py defs.py catalog.py character.py
-  seeds/    内置女主角设定书与默认属性定义 JSON
+  game/     clock.py tags.py attributes.py events.py prompt.py
+  routes/   saves.py chat.py state.py advance.py events.py defs.py catalog.py character.py
+  seeds/    内置女主角设定书、默认属性与事件定义 JSON
   tests/    game/ 纯函数层单元测试
 frontend/
   src/      views/ components/ stores/ api/ styles/ router/
@@ -79,5 +79,5 @@ cd backend
 
 ## 当前进度
 
-- 已完成：M1 骨架（数据模型建表与种子、存档 CRUD、模型目录、SSE 对话闭环、状态标签协议、Vue 基础界面）；M2 女主角刻画（内置设定书种子与启动装载、prompt 深度注入、属性定义种子与管理接口）。
-- 计划中：M3 事件与时间、M3.5 多轮场景、M4 记忆、M5 行动与经济、M6 打磨。
+- 已完成：M1 骨架（数据模型建表与种子、存档 CRUD、模型目录、SSE 对话闭环、状态标签协议、Vue 基础界面）；M2 女主角刻画（内置设定书种子与启动装载、prompt 深度注入、属性定义种子与管理接口）；M3 事件与时间（虚拟时钟推进与属性 tick、三类事件引擎与事件种子、推进面板与互动菜单）。
+- 计划中：M3.5 多轮场景、M4 记忆、M5 行动与经济、M6 打磨。
