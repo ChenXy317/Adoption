@@ -310,6 +310,20 @@ def _message_dict(message: Message) -> dict:
     }
 
 
+def write_time_note(session: Session, save: Save) -> Message:
+    """非对话来源的推进：写入时间说明 system 消息，保证 AI 的时间认知同步。"""
+    abs_now = clock.absolute_minutes(save.game_minutes, save.settings or {})
+    message = Message(
+        save_id=save.id,
+        role="system",
+        content=f"时间推进到了 {clock.full_label(abs_now)}。",
+        game_minutes_at=abs_now,
+    )
+    session.add(message)
+    session.flush()
+    return message
+
+
 def write_changes(session: Session, save_id: int, values: dict, changes: list[dict]) -> None:
     """把属性变化写入 attribute_values；缺行时自动补建（属性定义晚于存档创建）。"""
     for change in changes:
@@ -471,6 +485,7 @@ def _roll_new_days(
                 state[event.key]["reason"] = reason
     if day_starts:
         set_flag(session, save.id, "random_rolls", state)
+        session.flush()
 
 
 def _collect_fixed(
@@ -554,10 +569,13 @@ def settle_time(
     source: str = "advance",
     rng: random.Random | None = None,
     state_scene: dict | None = None,
+    skip_scene_enter: bool = False,
 ) -> dict:
     """推进到目标游戏分钟并结算：tick → 跨日随机判定 → 事件触发 → 场景生命周期。
 
     同一事务内完成，最终 commit 由调用方负责。values 会被就地更新为最终属性值。
+    ordered_changes 按实际应用顺序记录全部属性变化（供前端按序覆盖）；
+    skip_scene_enter 供「本幕刚结束」的调用方使用，避免同一次结算内接力进入新场景。
     """
     rng = rng or random.Random()
     defs_map = {d.key: d for d in defs}
@@ -571,6 +589,7 @@ def settle_time(
     triggered_ids, last_at = load_event_stats(session, save.id)
     triggered_results: list[dict] = []
     tick_changes: list[dict] = []
+    ordered_changes: list[dict] = []
     pending_days: list[int] = []
     forced_scene: str | None = None
 
@@ -578,6 +597,7 @@ def settle_time(
         session, save, defs_map, values, target_game_minutes
     )
     tick_changes.extend(ticks)
+    ordered_changes.extend(ticks)
     pending_days.extend(crossed)
 
     if any(event.category == "random" for event in event_defs):
@@ -627,6 +647,7 @@ def settle_time(
                 session, save, event, ctx, values, defs_map, source=source
             )
             triggered_results.append(result)
+            ordered_changes.extend(result["attrs"])
             exclude.add(event.key)
             triggered_ids.add(event.id)
             last_at[event.key] = ctx.absolute
@@ -641,6 +662,7 @@ def settle_time(
                     save.game_minutes + result["advance_minutes"],
                 )
                 tick_changes.extend(extra_ticks)
+                ordered_changes.extend(extra_ticks)
                 pending_days.extend(extra_crossed)
 
     from game import scenes
@@ -653,17 +675,30 @@ def settle_time(
         source=source,
         state_scene=state_scene,
         forced_key=forced_scene,
+        skip_enter=skip_scene_enter,
     )
+    for entry in (scene_result["entered"], scene_result["ended"]):
+        if entry:
+            ordered_changes.extend(entry.get("attrs") or [])
     scene_advance = sum(
         int(entry["advance_minutes"])
         for entry in (scene_result["entered"], scene_result["ended"])
         if entry and entry.get("advance_minutes")
     )
     if scene_advance > 0:
-        _extra, extra_ticks, _extra_crossed = _advance_core(
+        _extra, extra_ticks, extra_crossed = _advance_core(
             session, save, defs_map, values, save.game_minutes + scene_advance
         )
         tick_changes.extend(extra_ticks)
+        ordered_changes.extend(extra_ticks)
+        if extra_crossed and any(e.category == "random" for e in event_defs):
+            since_scene = _since_map(
+                last_at, clock.absolute_minutes(save.game_minutes, save.settings or {})
+            )
+            _roll_new_days(
+                session, save, event_defs, values, extra_crossed, rng, triggered_ids,
+                since_scene,
+            )
 
     now_abs = clock.absolute_minutes(save.game_minutes, save.settings or {})
     scene_messages = [
@@ -674,6 +709,7 @@ def settle_time(
     return {
         "delta": delta,
         "tick_changes": tick_changes,
+        "ordered_changes": ordered_changes,
         "triggered": triggered_results,
         "messages": [r["message"] for r in triggered_results] + scene_messages,
         "game_minutes": save.game_minutes,

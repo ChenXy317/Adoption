@@ -496,10 +496,12 @@ def settle_scenes(
     source: str = "chat",
     state_scene: dict | None = None,
     forced_key: str | None = None,
+    skip_enter: bool = False,
 ) -> dict:
     """场景生命周期统一结算：先结束判定（进行中），再进入评估（无活跃场景时）。
 
     source="chat" 视为一轮对话（turns +1）；state_scene 为 AI 状态标签中的 scene 动作。
+    skip_enter 用于「本幕刚结束」的调用方，本次结算不再接力进入新场景。
     返回 {entered, ended, active}；调用方负责 commit 与推进时间。
     """
     active = get_active(session, save.id)
@@ -530,7 +532,7 @@ def settle_scenes(
                 session,
                 save,
                 scene,
-                active,
+                {**active, "turns": turns_after},
                 ctx,
                 values,
                 defs_map,
@@ -541,7 +543,7 @@ def settle_scenes(
         elif is_turn:
             active = {**active, "turns": turns_after}
             set_active(session, save.id, active)
-    if active is None and ended is None:
+    if active is None and ended is None and not skip_enter:
         entered = try_enter(
             session, save, defs_map, values, source=source, forced_key=forced_key
         )

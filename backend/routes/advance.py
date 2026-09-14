@@ -68,28 +68,23 @@ def _advance_and_settle(session: Session, save: Save, delta: int, source: str) -
     values = load_attr_values(session, save.id)
     defs = list(session.scalars(select(AttributeDef)))
     target_game = old_game + max(0, int(delta))
-    target_abs = clock.absolute_minutes(target_game, settings)
-    note = Message(
-        save_id=save.id,
-        role="system",
-        content=f"时间推进到了 {clock.full_label(target_abs)}。",
-        game_minutes_at=target_abs,
-    )
-    session.add(note)
-    session.flush()
     settled = events.settle_time(
         session, save, defs, values, target_game, source=source
     )
-    session.commit()
     new_abs = clock.absolute_minutes(save.game_minutes, settings)
+    note = None
+    if int(save.game_minutes) > old_game:
+        note = events.write_time_note(session, save)
+    session.commit()
     virtual = {
         "absolute_minutes": new_abs,
         **clock.split(new_abs),
         "label": clock.time_label(new_abs),
     }
-    changes = settled["tick_changes"] + [
-        c for item in settled["triggered"] for c in item["attrs"]
-    ]
+    changes = settled["ordered_changes"]
+    messages = list(settled["messages"])
+    if note is not None:
+        messages.append(_message_dict(note))
     return {
         "game_minutes": save.game_minutes,
         "advance_minutes": int(save.game_minutes) - old_game,
@@ -107,7 +102,7 @@ def _advance_and_settle(session: Session, save: Save, delta: int, source: str) -
             }
             for item in settled["triggered"]
         ],
-        "messages": [_message_dict(note), *settled["messages"]],
+        "messages": messages,
     }
 
 

@@ -377,7 +377,11 @@ def _prepare_summary(save_id: int) -> dict | None:
                 .limit(MEMORY_EXISTING_LIMIT)
             )
         )
-        model_key = (MEMORY_MODEL or "").strip() or save.model_key
+        model_key = (
+            str((save.settings or {}).get("memory_model") or "").strip()
+            or (MEMORY_MODEL or "").strip()
+            or save.model_key
+        )
         try:
             runtime = get_runtime(session, model_key, http=False)
         except AIClientError as e:
@@ -452,7 +456,10 @@ def _apply_summary(prepared: dict, raw: str) -> dict | None:
 
 
 async def run_summary(save_id: int) -> dict | None:
-    """异步执行一次总结：准备（线程池）→ LLM 调用 → 落库（线程池）。"""
+    """异步执行一次总结：准备（线程池）→ LLM 调用 → 落库（线程池）。
+
+    任何异常都会把任务标记为 failed，避免任务卡在 running 状态。
+    """
     prepared = await run_in_threadpool(_prepare_summary, save_id)
     if prepared is None:
         return None
@@ -468,13 +475,24 @@ async def run_summary(save_id: int) -> dict | None:
         await run_in_threadpool(_fail_job, prepared["job_id"], str(e))
         logger.warning("记忆总结调用失败: %s", e)
         return None
-    return await run_in_threadpool(_apply_summary, prepared, raw)
+    except Exception as e:
+        await run_in_threadpool(_fail_job, prepared["job_id"], str(e))
+        logger.exception("记忆总结调用异常（save=%s）", save_id)
+        return None
+    try:
+        return await run_in_threadpool(_apply_summary, prepared, raw)
+    except Exception as e:
+        await run_in_threadpool(_fail_job, prepared["job_id"], str(e))
+        logger.exception("记忆总结落库异常（save=%s）", save_id)
+        return None
 
 
 def _fail_job(job_id: int, error: str) -> None:
     session = SessionLocal()
     try:
-        _finish_job(session, job_id, "failed", error)
+        job = session.get(MemoryJob, job_id)
+        if job is not None and job.status != "done":
+            _finish_job(session, job_id, "failed", error)
         session.commit()
     finally:
         session.close()

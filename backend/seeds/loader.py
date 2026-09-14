@@ -12,7 +12,7 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from config import SEEDS_DIR
+from config import SCENE_MAX_TURNS_DEFAULT, SEEDS_DIR
 from orm import AttributeDef, Character, EventDef, Save, SceneDef
 
 logger = logging.getLogger(__name__)
@@ -165,7 +165,7 @@ def apply_scene_seeds(session: Session) -> None:
             "scene_prompt": item.get("scene_prompt") or "",
             "goal": item.get("goal") or "",
             "min_turns": int(item.get("min_turns", 3) or 0),
-            "max_turns": int(item.get("max_turns", 12) or 0),
+            "max_turns": int(item.get("max_turns", SCENE_MAX_TURNS_DEFAULT) or 0),
             "exit": item.get("exit") or {},
             "effects": item.get("effects") or {},
             "next_scenes": item.get("next_scenes") or [],

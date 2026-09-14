@@ -12,6 +12,7 @@ import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -106,6 +107,26 @@ async def http_exception_handler(request, exc: HTTPException):
     return JSONResponse(
         status_code=exc.status_code,
         content={"code": "error", "message": str(exc.detail), "detail": ""},
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc: RequestValidationError):
+    """请求参数错误也返回统一的错误结构（前端 api 客户端依赖 message 字段）。"""
+    errors = exc.errors()
+    first = errors[0] if errors else {}
+    loc = ".".join(
+        str(item) for item in first.get("loc", []) if item not in ("body", "query", "path")
+    )
+    message = str(first.get("msg") or "参数不合法")
+    text = f"{loc}：{message}" if loc else message
+    return JSONResponse(
+        status_code=422,
+        content={
+            "code": "validation_error",
+            "message": f"请求参数不合法（{text}）",
+            "detail": "",
+        },
     )
 
 

@@ -125,15 +125,23 @@
                   style="flex: 1"
                 />
               </div>
+              <div
+                v-if="!editForm.use_env_key && provider?.has_api_key"
+                class="row"
+                style="margin-top: 6px"
+              >
+                <button class="btn" @click="clearStoredKey">清除已存密钥</button>
+              </div>
             </div>
 
             <h3>模型</h3>
             <div v-for="m in provider?.models || []" :key="m.id" class="model-row">
-              <div class="row" style="flex: 1">
-                <span class="key dim">{{ m.key }}</span>
+              <div class="row" style="flex: 1; min-width: 220px">
+                <span class="key dim">{{ provider?.slug }}:</span>
+                <input v-model="modelIds[m.id]" placeholder="model-id" style="flex: 1" />
               </div>
-              <input v-model="modelNames[m.id]" placeholder="显示名" style="width: 160px" />
-              <button class="btn" @click="saveModel(m)">改名</button>
+              <input v-model="modelNames[m.id]" placeholder="显示名" style="width: 140px" />
+              <button class="btn" @click="saveModel(m)">保存</button>
               <button class="btn" :disabled="testing === m.id" @click="test(m)">
                 {{ testing === m.id ? "测试中…" : "测试" }}
               </button>
@@ -185,6 +193,7 @@ const newModelName = ref("");
 const testing = ref(null);
 const results = reactive({});
 const modelNames = reactive({});
+const modelIds = reactive({});
 
 const createForm = reactive({
   slug: "",
@@ -225,8 +234,10 @@ function selectProvider(p) {
   selectedId.value = p.id;
   error.value = "";
   for (const key of Object.keys(modelNames)) delete modelNames[key];
+  for (const key of Object.keys(modelIds)) delete modelIds[key];
   for (const m of p.models) {
     modelNames[m.id] = m.display_name;
+    modelIds[m.id] = m.model_id;
     results[m.id] = null;
   }
   Object.assign(editForm, {
@@ -302,11 +313,29 @@ async function addModel() {
 
 async function saveModel(m) {
   error.value = "";
+  const modelId = (modelIds[m.id] ?? "").trim();
+  if (!modelId) {
+    error.value = "model-id 不能为空";
+    return;
+  }
+  const patch = { display_name: (modelNames[m.id] ?? "").trim() };
+  if (modelId !== m.model_id) patch.model_id = modelId;
   try {
-    await catalog.updateModel(selectedId.value, m.id, {
-      display_name: modelNames[m.id] ?? "",
-    });
-    ui.toast("ok", "已更新显示名");
+    await catalog.updateModel(selectedId.value, m.id, patch);
+    ui.toast("ok", "已保存");
+    selectProvider(provider.value);
+  } catch (e) {
+    error.value = e.message;
+  }
+}
+
+async function clearStoredKey() {
+  if (!window.confirm("清除该供应商已保存的 API Key？")) return;
+  error.value = "";
+  try {
+    await catalog.updateProvider(selectedId.value, { api_key: "" });
+    ui.toast("ok", "已清除已存密钥");
+    editForm.api_key = "";
   } catch (e) {
     error.value = e.message;
   }

@@ -12,10 +12,20 @@ from sqlalchemy.orm import Session
 from db import get_session
 from game import clock, events, scenes
 from helpers import error, get_save_or_error, load_attr_values, save_settle_lock
-from orm import AttributeDef, SceneDef, SceneLog
+from orm import AttributeDef, Message, SceneDef, SceneLog
 from schemas import SceneEndIn, SceneEnterIn
 
 router = APIRouter(tags=["scenes"])
+
+
+def _message_dict(message: Message) -> dict:
+    return {
+        "id": message.id,
+        "role": message.role,
+        "content": message.content,
+        "meta": message.meta or {},
+        "game_minutes_at": message.game_minutes_at,
+    }
 
 
 def _virtual(save) -> dict:
@@ -110,15 +120,21 @@ def enter_scene(
             save.game_minutes + entered["advance_minutes"],
             source="manual",
         )
+        note = None
+        if int(save.game_minutes) > old_game:
+            note = events.write_time_note(session, save)
         session.commit()
+        messages = [entered["message"], *settled["messages"]]
+        if note is not None:
+            messages.append(_message_dict(note))
         return {
             "scene": scenes.brief(entered),
             "active": scenes.public_active(scenes.get_active(session, save_id)),
             "game_minutes": save.game_minutes,
             "advance_minutes": int(save.game_minutes) - old_game,
             "virtual": _virtual(save),
-            "changes": entered["attrs"] + settled["tick_changes"],
-            "messages": [entered["message"], *settled["messages"]],
+            "changes": entered["attrs"] + settled["ordered_changes"],
+            "messages": messages,
         }
 
 
@@ -174,14 +190,21 @@ def end_scene(
             values,
             save.game_minutes + ended["advance_minutes"],
             source="manual",
+            skip_scene_enter=True,
         )
+        note = None
+        if int(save.game_minutes) > old_game:
+            note = events.write_time_note(session, save)
         session.commit()
+        messages = [ended["message"], *settled["messages"]]
+        if note is not None:
+            messages.append(_message_dict(note))
         return {
             "scene": scenes.brief(ended),
             "active": None,
             "game_minutes": save.game_minutes,
             "advance_minutes": int(save.game_minutes) - old_game,
             "virtual": _virtual(save),
-            "changes": ended["attrs"] + settled["tick_changes"],
-            "messages": [ended["message"], *settled["messages"]],
+            "changes": ended["attrs"] + settled["ordered_changes"],
+            "messages": messages,
         }

@@ -58,7 +58,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
 import ActionPanel from "../components/ActionPanel.vue";
@@ -96,14 +96,28 @@ const money = computed(() => {
   return Math.round(value * 100) / 100;
 });
 
-onMounted(async () => {
+async function load(saveId) {
   try {
-    await Promise.all([game.loadState(props.id), chat.loadMessages(props.id)]);
+    await Promise.all([game.loadState(saveId), chat.loadMessages(saveId)]);
   } catch (e) {
     ui.toast("error", e.message);
     router.push("/");
   }
+}
+
+onMounted(() => {
+  load(props.id);
 });
+
+watch(
+  () => props.id,
+  (id) => {
+    if (id == null) return;
+    chat.cancel();
+    game.current = null;
+    load(id);
+  }
+);
 
 onBeforeUnmount(() => {
   chat.cancel();

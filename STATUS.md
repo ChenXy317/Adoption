@@ -1,6 +1,6 @@
 # STATUS — 当前状态记录
 
-> 更新时间：2026-09-14（M4 记忆系统已完成，未提交；真实模型端到端与浏览器自检通过）
+> 更新时间：2026-09-14（M4 已提交 `2ecceb3`；M4 后全量审查修复已完成，未提交）
 > 用途：跨会话交接。新会话先读 `PLAN.md`（唯一真相源）+ 本文件，再动手。
 
 ## 一、项目速览
@@ -19,7 +19,8 @@
 | M3 事件与时间（虚拟时钟结算、三类事件、推进面板、事件种子） | 已完成，已提交 `679a356` |
 | 全量审查修复 | 已完成，已提交 `d55e9e0` |
 | M3.5 多轮场景（场景引擎、STATE scene、场景接口、SceneBanner、场景种子） | 已完成，已提交 `5551cd0` |
-| M4 记忆系统（总结流水线与互斥任务、检索注入、记忆面板、场景记忆） | **已完成，未提交** |
+| M4 记忆系统（总结流水线与互斥任务、检索注入、记忆面板、场景记忆） | 已完成，已提交 `2ecceb3` |
+| M4 后全量审查修复（结算顺序、场景接力、总结任务兜底、集成测试） | **已完成，未提交** |
 | M5 行动与经济 | 未开工（下一步，见第八节） |
 
 ## 三、运行方式
@@ -29,7 +30,7 @@
 - 服务端口：**18730**（`APP_PORT` 可配）；启动后浏览器开 `http://127.0.0.1:18730`
 - 启动：双击 `快速启动.bat`（缺 dist 会自动构建）；或手动：
   `cd backend; .venv\Scripts\python.exe main.py`
-- 测试：`cd backend; .venv\Scripts\python.exe -m unittest discover -s tests`（**88 项**）
+- 测试：`cd backend; .venv\Scripts\python.exe -m unittest discover -s tests`（**97 项**，含 9 项 DB 集成测试）
 - 前端：改动后 `cd frontend; npm run build`（后端托管 dist）；开发模式 `npm run dev`（Vite 代理 18730）
 
 ## 四、数据现状（库内）
@@ -41,7 +42,9 @@
 - 属性 tick 已生效：mood `regress`（回归 50，0.5/时）、vigilance `decay`（1/时）
 - 供应商同前：`aihubmix` / `openrouter`（均 `use_env_key`，库内无明文密钥）
 
-## 五、M4 变更清单（未提交）
+## 五、M4 与审查修复变更清单
+
+**M4（已提交 `2ecceb3`）**
 
 **后端**
 - `game/memory.py`（新）：纯函数（`parse_summary` / `merge_entries` / `memory_score` / `select_memories` / `timeline_lines` / `clip_lines` / `build_summary_messages`）+ DB 区（`trigger_if_due` 阈值登记、`requeue_interrupted` 启动补跑、`_claim_job` 条件抢占、`_prepare_summary` / `_apply_summary`、`run_summary` / `safe_run_summary`、`retrieve` / `mark_recalled`）
@@ -57,9 +60,29 @@
 
 **测试**：68 → **88 项**（新增 `tests/test_memory.py` 20 项）
 
-## 六、M4 验证记录（2026-09-14）
+**审查修复（未提交，2026-09-14）**
 
-- `unittest` 88 项全过；`npm run build` 通过
+后端
+- `game/events.py`：新增 `write_time_note`（非对话推进的 system 时间说明）；`settle_time` 新增 `ordered_changes`（按实际应用顺序的属性变化，修正前端覆盖顺序）与 `skip_scene_enter`；场景推进跨日时补登记随机判定；`_roll_new_days` 写 flag 后 flush（修复首次跨日判定同事务内读不到 `random_rolls`、随机事件延迟一天触发的缺陷）
+- `game/scenes.py`：`settle_scenes` 支持 `skip_enter`（手动结束场景后不接力进入下一幕）；结束结算按自增后的轮数记录（原记录少 1）
+- `routes/chat.py`：`scene_update.active` 改用 `public_active`（不再下发场景设定原文）；属性变化改用 `ordered_changes`
+- `routes/scenes.py` / `routes/events.py` / `routes/advance.py`：非对话推进统一补时间说明 system 消息；手动结束场景传 `skip_scene_enter=True`
+- `game/memory.py`：总结任务任何异常都落 failed（不再卡 running）；支持存档级 `settings.memory_model` 覆盖总结模型（与删除保护口径一致）
+- `main.py`：新增 422 参数错误的统一错误结构（前端 api 客户端依赖 message 字段）
+- `seeds/loader.py`：`max_turns` 缺省值改用 `SCENE_MAX_TURNS_DEFAULT`（恢复该配置引用）
+
+前端
+- `stores/chat.js`：有回复文本但流中断时也刷新权威状态
+- `views/Game.vue`：路由参数变化时重新加载（切换存档不残留旧数据）
+- `ModelCatalogModal.vue`：模型 model-id 可编辑（后端已有引用保护）；新增「清除已存密钥」
+
+测试与文档
+- 新增 `tests/test_integration.py`（9 项，使用独立 `new_idea_test` 库、自动建删）：结算 tick/固定事件/跨日随机、场景生命周期与不接力、手动结束不接力、advance 时间说明、对话结算（含解析失败兜底）、记忆总结流水线与失败落库、422 错误格式
+- `PLAN.md` §5.3/§7/§9 明确：事件/场景定义 CRUD 推迟（当前以种子文件维护，列入 M6 之后）
+
+## 六、验证记录（2026-09-14）
+
+- `unittest` **97 项**全过（纯函数 88 + DB 集成 9）；`npm run build` 通过
 - httpx 端到端（真实模型 aihubmix，临时档已清理，21 项全过）：22 条消息 → 达阈值登记 pending 任务 → 总结新增 6 条（抽取质量抽检良好）→ 进度推进 / 未总结清零 / 任务 done → 记忆 CRUD → prompt 注入「长期记忆」且召回计数更新 → 模型缺失时失败状态落库
 - 浏览器实测：记忆弹层打开（未总结 22 条）→ 手动总结 → 6 条记忆上屏 → 归档 → 恢复
 
@@ -72,6 +95,10 @@
 - **检索注入**：重要性 × 新近度打分（新记忆最高约 2 倍加成、随时间衰减到 1 倍）；核心（`relationship` 或 ≥8）常驻预算；总预算 2000 字符；注入后更新 `last_recalled_at` / `recall_count`
 - **总结模型**：`MEMORY_MODEL`，空则用存档主模型；输出上限 2048 tokens
 - **场景记忆去重**：场景结束写的 `memories` 会作为「已有记忆」附给总结提示，避免重复抽取
+- **场景接力**：手动结束场景时 `settle_time(skip_scene_enter=True)`，本次结算不再进入新场景（与对话路径同口径）；下一次结算再评估
+- **结算顺序**：`ordered_changes` 为唯一权威的属性变化序列（AI → tick → 事件/场景效果），前端按序覆盖后再以 state 刷新兜底
+- **总结任务兜底**：任何异常都会把 job 落 failed（不卡 running）；总结模型优先级 `save.settings.memory_model` → `MEMORY_MODEL` → 存档主模型
+- **随机判定**：跨日判定写 `random_rolls` 后 flush；场景/事件推进跨日同样登记，避免当日判定丢失
 
 ## 八、下一步 M5（行动与经济）建议顺序（PLAN 5.8）
 
@@ -92,11 +119,12 @@
 - `save_flags` 读写用 `events.set_flag` / `scenes.get_active`（dict 值不加 "value" 包装）；场景 active 读旧格式时兼容 `{"value": {...}}`
 - 总结任务的 LLM 调用不持结算锁（避免阻塞聊天）；`asyncio.run` 只适用于脚本自检，服务内统一走 BackgroundTasks / lifespan 任务
 - codebase-memory 图谱**已索引**本项目（项目名 `new-idea`；M3.5/M4 新代码可重索引）
+- 集成测试会建 `new_idea_test` 库并在结束时删除；需 MySQL 可用（与原有测试的前置条件相同）
 - 交流用中文；提交信息用泛化描述（AGENTS.md）；提交前建议先跑单测
 
 ## 十、给下一个会话的建议
 
-- 动手前：读 `PLAN.md` + 本文件 → `git status`（M4 未提交）→ 建议先提交 M4 再开工 M5
+- 动手前：读 `PLAN.md` + 本文件 → `git status`（M4 后审查修复未提交）→ 建议先提交这批修复再开工 M5
 - 后端改动需重启服务（未开 reload）；前端改动需 `npm run build`
 - 验证习惯：先 `unittest` → 再 httpx 端到端（含 SSE/真实模型）→ 最后浏览器实测
 - 聊天验证注意选可用模型（aihubmix 的 `xiaomi-mimo-v2.5-free`）；总结同样走该模型（或配 `MEMORY_MODEL`）

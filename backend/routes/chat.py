@@ -207,11 +207,7 @@ def _settle(save_id: int, text: str, tag_raw: str, interrupted: bool) -> dict:
                 **clock.split(abs_minutes),
                 "label": clock.time_label(abs_minutes),
             }
-            combined = (
-                changes
-                + settled["tick_changes"]
-                + [c for item in settled["triggered"] for c in item["attrs"]]
-            )
+            combined = changes + settled["ordered_changes"]
             return {
                 "message_id": assistant.id if assistant else None,
                 "changes": combined,
@@ -236,7 +232,7 @@ def _settle(save_id: int, text: str, tag_raw: str, interrupted: bool) -> dict:
                 "scene": {
                     "entered": scenes.brief(scene_info.get("entered")),
                     "ended": scenes.brief(scene_info.get("ended")),
-                    "active": scene_info.get("active"),
+                    "active": scenes.public_active(scene_info.get("active")),
                 },
                 "memory_due": memory_due,
                 "messages": settled["messages"],

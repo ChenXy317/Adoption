@@ -109,7 +109,7 @@ FastAPI
 - cost JSON（manual 专用）：`{"money":80,"time_minutes":180}`
 - 时机：每次交互后 + 时间推进结算时（含跨日随机判定）+ 手动触发；离线世界静止，无需页面加载评估
 - manual 事件：点击 → 校验条件与余额 → 扣 cost → 注入场景 prompt 由 AI 叙述，落 `event_logs` 与消息
-- 管理界面：事件/场景定义 CRUD + 启停 + 调试手动触发
+- 管理界面：事件/场景定义 CRUD + 启停 + 调试手动触发（**推迟**：当前以种子文件维护，接口与编辑器列入 M6 之后）
 
 **多轮场景（scene）**：
 
@@ -234,7 +234,7 @@ FastAPI
 | POST | `/api/saves/{id}/events/{key}/trigger` | manual 事件触发（校验 cost） |
 | GET/POST | `/api/saves/{id}/scenes` | 场景历史 / 手动进入（调试） |
 | POST | `/api/saves/{id}/scenes/end` | 手动结束当前场景（正常收尾） |
-| CRUD | `/api/attribute-defs`、`/api/event-defs`、`/api/scene-defs` | 定义管理 |
+| CRUD | `/api/attribute-defs` | 属性定义管理（`/api/event-defs`、`/api/scene-defs` 推迟，见 §5.3） |
 | GET/POST/PATCH/DELETE | `/api/saves/{id}/memories` | 记忆管理 |
 | POST | `/api/saves/{id}/memories/summarize` | 手动总结 |
 | GET | `/api/character` | 女主角设定书（内置内容，只读） |
@@ -270,7 +270,7 @@ New Idea/（= D:\Projects\New Idea）
 | M3.5 多轮场景 | scene_defs 定义、进入/持续/结束/结算全生命周期、STATE 标签扩展、场景 prompt 注入、SceneBanner 与场景定义管理、种子场景 2–3 个 | 触发场景→多轮目标与轮数持续生效→AI/上限自然收尾→结算与场景记忆落库；同时仅一个活跃场景；min_turns 内拒绝提前收尾 |
 | M4 记忆系统 | 总结流水线、记忆管理面板、检索注入 | 达到阈值自动总结；记忆影响后续对话 |
 | M5 行动与经济 | 行动面板（数据驱动日常互动：陪伴/照顾/外出）、打工、付费手动事件（逛街/看电影）、送礼（专属对话）、冷落（虚拟时间版）、性格演化、主动消息（推进触发）、事件链 | 行动菜单可增条目即生效；打工赚钱→消费送礼→触发专属对话；推进越过时点收到主动消息；互动间隔过大好感下降 |
-| M6 打磨 | 导出备份（建议 M2 后即做轻量导出）、主题、向量检索（可选）、README | 完整备份可恢复 |
+| M6 打磨 | 导出备份（建议 M2 后即做轻量导出）、主题、向量检索（可选）、事件/场景定义管理界面、README | 完整备份可恢复 |
 
 ## 10. 已定 / 待定
 

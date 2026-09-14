@@ -11,9 +11,19 @@ from db import get_session
 from game import clock, events
 from game.attributes import apply_effects
 from helpers import error, get_save_or_error, load_attr_values, save_settle_lock
-from orm import AttributeDef, EventDef, EventLog
+from orm import AttributeDef, EventDef, EventLog, Message
 
 router = APIRouter(tags=["events"])
+
+
+def _message_dict(message: Message) -> dict:
+    return {
+        "id": message.id,
+        "role": message.role,
+        "content": message.content,
+        "meta": message.meta or {},
+        "game_minutes_at": message.game_minutes_at,
+    }
 
 
 @router.get("/api/saves/{save_id}/events")
@@ -121,6 +131,9 @@ def trigger_manual(
             save.game_minutes + result["advance_minutes"],
             source="manual",
         )
+        note = None
+        if int(save.game_minutes) > old_game:
+            note = events.write_time_note(session, save)
         session.commit()
 
         new_abs = clock.absolute_minutes(save.game_minutes, settings)
@@ -129,12 +142,10 @@ def trigger_manual(
             **clock.split(new_abs),
             "label": clock.time_label(new_abs),
         }
-        changes = (
-            cost_changes
-            + result["attrs"]
-            + settled["tick_changes"]
-            + [c for item in settled["triggered"] for c in item["attrs"]]
-        )
+        changes = cost_changes + result["attrs"] + settled["ordered_changes"]
+        messages = [result["message"], *settled["messages"]]
+        if note is not None:
+            messages.append(_message_dict(note))
         return {
             "event": {
                 "key": result["key"],
@@ -159,5 +170,5 @@ def trigger_manual(
                 }
                 for item in settled["triggered"]
             ],
-            "messages": [result["message"], *settled["messages"]],
+            "messages": messages,
         }
