@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from db import get_session
-from game import clock, events
+from game import clock, events, scenes
 from game.attributes import phase_of
 from helpers import (
     attribute_items,
@@ -16,7 +16,7 @@ from helpers import (
     get_save_or_error,
     load_attr_values,
 )
-from orm import AttributeDef, Character, EventDef, EventLog, Message, SaveFlag
+from orm import AttributeDef, Character, EventDef, EventLog, Message
 
 router = APIRouter(tags=["state"])
 
@@ -36,7 +36,7 @@ def get_state(save_id: int, session: Session = Depends(get_session)):
     character = (
         session.get(Character, save.character_id) if save.character_id else None
     )
-    active_flag = session.get(SaveFlag, (save_id, "active_scene"))
+    active_flag = scenes.get_active(session, save_id)
     recent_rows = session.execute(
         select(EventLog, EventDef.name)
         .outerjoin(EventDef, EventLog.event_id == EventDef.id)
@@ -74,7 +74,7 @@ def get_state(save_id: int, session: Session = Depends(get_session)):
         },
         "attributes": attribute_items(defs, values),
         "money": values.get("money", 0.0),
-        "active_scene": (active_flag.value if active_flag else None),
+        "active_scene": scenes.public_active(active_flag),
         "recent_events": recent_events,
         "manual_events": events.manual_candidates(session, save, values),
     }

@@ -400,6 +400,7 @@ def apply_event(
         "attrs": attr_changes,
         "flags": flags,
         "advance_minutes": advance,
+        "start_scene": str(effects.get("start_scene") or "").strip() or None,
     }
 
 
@@ -552,8 +553,9 @@ def settle_time(
     *,
     source: str = "advance",
     rng: random.Random | None = None,
+    state_scene: dict | None = None,
 ) -> dict:
-    """推进到目标游戏分钟并结算：tick → 跨日随机判定 → 事件触发。
+    """推进到目标游戏分钟并结算：tick → 跨日随机判定 → 事件触发 → 场景生命周期。
 
     同一事务内完成，最终 commit 由调用方负责。values 会被就地更新为最终属性值。
     """
@@ -570,6 +572,7 @@ def settle_time(
     triggered_results: list[dict] = []
     tick_changes: list[dict] = []
     pending_days: list[int] = []
+    forced_scene: str | None = None
 
     delta, ticks, crossed = _advance_core(
         session, save, defs_map, values, target_game_minutes
@@ -627,6 +630,8 @@ def settle_time(
             exclude.add(event.key)
             triggered_ids.add(event.id)
             last_at[event.key] = ctx.absolute
+            if result["start_scene"] and forced_scene is None:
+                forced_scene = result["start_scene"]
             if result["advance_minutes"] > 0:
                 _extra, extra_ticks, extra_crossed = _advance_core(
                     session,
@@ -638,14 +643,42 @@ def settle_time(
                 tick_changes.extend(extra_ticks)
                 pending_days.extend(extra_crossed)
 
+    from game import scenes
+
+    scene_result = scenes.settle_scenes(
+        session,
+        save,
+        defs_map,
+        values,
+        source=source,
+        state_scene=state_scene,
+        forced_key=forced_scene,
+    )
+    scene_advance = sum(
+        int(entry["advance_minutes"])
+        for entry in (scene_result["entered"], scene_result["ended"])
+        if entry and entry.get("advance_minutes")
+    )
+    if scene_advance > 0:
+        _extra, extra_ticks, _extra_crossed = _advance_core(
+            session, save, defs_map, values, save.game_minutes + scene_advance
+        )
+        tick_changes.extend(extra_ticks)
+
     now_abs = clock.absolute_minutes(save.game_minutes, save.settings or {})
+    scene_messages = [
+        entry["message"]
+        for entry in (scene_result["entered"], scene_result["ended"])
+        if entry and entry.get("message")
+    ]
     return {
         "delta": delta,
         "tick_changes": tick_changes,
         "triggered": triggered_results,
-        "messages": [r["message"] for r in triggered_results],
+        "messages": [r["message"] for r in triggered_results] + scene_messages,
         "game_minutes": save.game_minutes,
         "absolute_minutes": now_abs,
+        "scene": scene_result,
     }
 
 

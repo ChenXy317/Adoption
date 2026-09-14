@@ -43,12 +43,11 @@
 
         <EventPanel :events="game.current?.recent_events || []" />
 
-        <section class="card panel">
-          <h3>当前场景</h3>
-          <div class="dim small">
-            {{ game.current?.active_scene ? sceneLine : "暂无进行中的场景" }}
-          </div>
-        </section>
+        <SceneBanner
+          :save-id="$route.params.id"
+          :scene="game.current?.active_scene"
+          @ended="onSettled"
+        />
       </aside>
     </div>
 
@@ -66,6 +65,7 @@ import ChatInput from "../components/ChatInput.vue";
 import ChatStream from "../components/ChatStream.vue";
 import EventPanel from "../components/EventPanel.vue";
 import ModelCatalogModal from "../components/ModelCatalogModal.vue";
+import SceneBanner from "../components/SceneBanner.vue";
 import StatusBars from "../components/StatusBars.vue";
 import { useChatStore } from "../stores/chat";
 import { useGameStore } from "../stores/game";
@@ -90,12 +90,6 @@ const characterLine = computed(() => {
 const money = computed(() => {
   const value = game.current?.money ?? 0;
   return Math.round(value * 100) / 100;
-});
-
-const sceneLine = computed(() => {
-  const scene = game.current?.active_scene;
-  if (!scene) return "";
-  return `${scene.name || scene.key} · 第 ${(scene.turns || 0) + 1} 轮`;
 });
 
 onMounted(async () => {

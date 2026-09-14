@@ -67,6 +67,10 @@ ATTR_MAX_DELTA_PER_MESSAGE = 20  # 单轮状态标签对单个属性的变化上
 EVENT_MAX_PER_SETTLEMENT = 3       # 单次结算最多注入的事件数
 EVENT_RECENT_WINDOW_MINUTES = 180  # 事件情境注入 prompt 的有效窗口（虚拟分钟）
 
+# ── 多轮场景（详见 PLAN 5.3）──
+SCENE_PROMPT_CHAR_BUDGET = 600     # 场景设定注入 prompt 的字符预算
+SCENE_MEMORY_IMPORTANCE = 7        # 场景结束写入记忆的默认重要度（1-10）
+
 # ── 经济与冷落（M5 启用；数值已于 PLAN §10 定稿）──
 WORK_HOURS = 4                     # 打工耗时（虚拟小时）
 WORK_PAY = 120                     # 打工收益（金钱），时薪 30

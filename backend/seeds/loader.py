@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from config import SEEDS_DIR
-from orm import AttributeDef, Character, EventDef, Save
+from orm import AttributeDef, Character, EventDef, Save, SceneDef
 
 logger = logging.getLogger(__name__)
 
@@ -138,6 +138,54 @@ def apply_event_seeds(session: Session) -> None:
     if added or updated:
         session.commit()
         logger.info("事件种子装载完成：新增 %d 条，更新 %d 条", added, updated)
+
+
+def apply_scene_seeds(session: Session) -> None:
+    """装载内置场景定义（seeds/scenes.json 为准，覆盖同名场景的字段）。
+
+    与事件种子一致：已存在的自定义场景不被删除；种子移除的场景保持库内原样。
+    """
+    path = SEEDS_DIR / "scenes.json"
+    if not path.exists():
+        logger.warning("未找到场景种子文件: %s", path)
+        return
+    with open(path, encoding="utf-8") as f:
+        items = json.load(f)
+    existing = {row.key: row for row in session.scalars(select(SceneDef))}
+    added = updated = 0
+    for item in items:
+        key = (item.get("key") or "").strip()
+        if not key:
+            continue
+        fields = {
+            "name": item.get("name") or key,
+            "category": item.get("category", "story"),
+            "enter_trigger": item.get("enter_trigger") or {},
+            "enter_cost": item.get("enter_cost") or {},
+            "scene_prompt": item.get("scene_prompt") or "",
+            "goal": item.get("goal") or "",
+            "min_turns": int(item.get("min_turns", 3) or 0),
+            "max_turns": int(item.get("max_turns", 12) or 0),
+            "exit": item.get("exit") or {},
+            "effects": item.get("effects") or {},
+            "next_scenes": item.get("next_scenes") or [],
+            "once": bool(item.get("once", False)),
+            "cooldown_minutes": int(item.get("cooldown_minutes", 0) or 0),
+            "priority": int(item.get("priority", 0) or 0),
+            "enabled": bool(item.get("enabled", True)),
+        }
+        definition = existing.get(key)
+        if definition is None:
+            session.add(SceneDef(key=key, **fields))
+            added += 1
+            continue
+        if any(getattr(definition, name) != value for name, value in fields.items()):
+            for name, value in fields.items():
+                setattr(definition, name, value)
+            updated += 1
+    if added or updated:
+        session.commit()
+        logger.info("场景种子装载完成：新增 %d 条，更新 %d 条", added, updated)
 
 
 def apply_character_seed(session: Session) -> None:

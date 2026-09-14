@@ -61,6 +61,7 @@ export const useChatStore = defineStore("chat", {
       let failed = false;
       let hadText = false;
       let eventTriggered = false;
+      let sceneChanged = false;
       try {
         await streamChat(
           saveId,
@@ -75,6 +76,9 @@ export const useChatStore = defineStore("chat", {
             event_triggered: (data) => {
               eventTriggered = true;
               this.pushMessages(data.messages);
+            },
+            scene_update: () => {
+              sceneChanged = true;
             },
             time_update: (data) => {
               game.applyTime(data);
@@ -109,7 +113,7 @@ export const useChatStore = defineStore("chat", {
         this.streaming = false;
         hadText = Boolean(assistant.content.trim());
         if (failed && !hadText) this._dropMessage(assistant);
-        if (settled || eventTriggered) {
+        if (settled || eventTriggered || sceneChanged) {
           game.loadState(saveId).catch(() => {});
         }
       }

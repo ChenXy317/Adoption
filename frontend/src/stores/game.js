@@ -39,6 +39,9 @@ export const useGameStore = defineStore("game", {
     async triggerManual(id, key) {
       return apiPost(`/api/saves/${id}/events/${encodeURIComponent(key)}/trigger`);
     },
+    async endScene(id, payload = {}) {
+      return apiPost(`/api/saves/${id}/scenes/end`, payload);
+    },
     applyAttrs(changes, phase = null) {
       if (!this.current) return;
       for (const change of changes || []) {

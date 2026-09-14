@@ -11,7 +11,7 @@ from config import (
     PROMPT_ATTR_CHAR_BUDGET,
     PROMPT_EVENT_CHAR_BUDGET,
 )
-from game import clock
+from game import clock, scenes
 from game.attributes import phase_key_of
 from orm import AttributeDef, Character, Message, Save
 
@@ -22,6 +22,7 @@ STATE_PROTOCOL = """\
 要求：
 - attrs：本次互动中明确变化的属性增量（整数），key 只能取当前状态里列出的属性；没有变化时输出 {}。
 - time：本次互动在故事中经过的虚拟分钟数（0-180 的整数），没有时间流逝则输出 0。
+- scene：仅在进行中的场景、且本幕该收尾时输出 {"action":"end","summary":"一句话总结本幕"}；场景继续时不要输出。
 - 无论是否有变化都必须输出标签；标签对玩家不可见，不要在正文中提及或解释标签。
 
 示例：
@@ -146,6 +147,7 @@ def build_messages(
     history: list[Message],
     settings: dict,
     active_events: list[dict] | None = None,
+    active_scene: dict | None = None,
 ) -> list[dict]:
     """组装 OpenAI 兼容消息列表（单条 system + 最近消息）。"""
     abs_minutes = clock.absolute_minutes(save.game_minutes, settings)
@@ -168,6 +170,9 @@ def build_messages(
         f"{_stage_note(character, phase_key, phase_label)}\n"
         f"属性：{_attr_line(defs, values)}"
     )
+    scene_text = scenes.scene_block(active_scene) if active_scene else ""
+    if scene_text:
+        system_parts.append(scene_text)
     event_block = _event_block(active_events or [])
     if event_block:
         system_parts.append(event_block)

@@ -19,7 +19,7 @@ from starlette.concurrency import run_in_threadpool
 from ai_client import AIClientError, ai
 from config import CHAT_HISTORY_MESSAGES, EVENT_RECENT_WINDOW_MINUTES
 from db import SessionLocal
-from game import clock, events
+from game import clock, events, scenes
 from game.attributes import apply_deltas, phase_of
 from game.prompt import build_messages
 from game.tags import StateTagStripper, parse_state
@@ -91,8 +91,16 @@ def _prepare(save_id: int, message: str) -> dict:
         active_events = events.recent_events(
             session, save, window_minutes=EVENT_RECENT_WINDOW_MINUTES, limit=3
         )
+        active_scene = scenes.get_active(session, save_id)
         messages = build_messages(
-            save, character, defs, values, history, settings, active_events
+            save,
+            character,
+            defs,
+            values,
+            history,
+            settings,
+            active_events,
+            active_scene,
         )
         return {
             "messages": messages,
@@ -124,6 +132,7 @@ def _settle(save_id: int, text: str, tag_raw: str, interrupted: bool) -> dict:
             state = parse_state(tag_raw)
             changes: list[dict] = []
             raw_advance = None
+            raw_scene = None
             if state is not None:
                 raw_attrs = state.get("attrs")
                 updated, changes = apply_deltas(
@@ -134,6 +143,8 @@ def _settle(save_id: int, text: str, tag_raw: str, interrupted: bool) -> dict:
                 raw_time = state.get("time")
                 if isinstance(raw_time, dict):
                     raw_advance = raw_time.get("advance_minutes")
+                if isinstance(state.get("scene"), dict):
+                    raw_scene = state.get("scene")
             if raw_advance is None:
                 time_advance = default_advance
             else:
@@ -169,11 +180,17 @@ def _settle(save_id: int, text: str, tag_raw: str, interrupted: bool) -> dict:
                 values,
                 old_game + time_advance,
                 source="chat",
+                state_scene=raw_scene,
             )
             total_advance = int(save.game_minutes) - old_game
             meta["ticks"] = settled["tick_changes"]
             if settled["triggered"]:
                 meta["events"] = [item["key"] for item in settled["triggered"]]
+            scene_info = settled.get("scene") or {}
+            if scene_info.get("entered"):
+                meta["scene_entered"] = scene_info["entered"]["key"]
+            if scene_info.get("ended"):
+                meta["scene_ended"] = scene_info["ended"]["key"]
             if assistant is not None:
                 assistant.game_minutes_at = settled["absolute_minutes"]
             session.commit()
@@ -210,6 +227,11 @@ def _settle(save_id: int, text: str, tag_raw: str, interrupted: bool) -> dict:
                     }
                     for item in settled["triggered"]
                 ],
+                "scene": {
+                    "entered": scenes.brief(scene_info.get("entered")),
+                    "ended": scenes.brief(scene_info.get("ended")),
+                    "active": scene_info.get("active"),
+                },
                 "messages": settled["messages"],
             }
     finally:
@@ -298,6 +320,15 @@ async def chat(save_id: int, req: ChatIn):
                 {
                     "events": settled["events"],
                     "messages": settled["messages"],
+                },
+            )
+        if settled["scene"]["entered"] or settled["scene"]["ended"]:
+            yield sse(
+                "scene_update",
+                {
+                    "entered": settled["scene"]["entered"],
+                    "ended": settled["scene"]["ended"],
+                    "active": settled["scene"]["active"],
                 },
             )
         yield sse(

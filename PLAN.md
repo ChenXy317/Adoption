@@ -5,7 +5,7 @@
 > 时间与现实完全隔离：纯虚拟时钟，由对话/行动推进；经济系统（金钱/打工/消费）作为互动燃料。
 > **定位：单女主、深刻画的 galgame 式体验（方向参考 Teaching Feeling）。女主角全局唯一（跨存档共享设定书）；存档 = 从头来过的周目。核心日常循环：照顾/陪伴互动 → 状态与关系渐变（警戒降、信任升）→ 时间推进 → 阶段解锁新互动与特殊事件。优先角色刻画深度，分支/日程等玩法后置。**
 
-- 状态：M1 骨架、M2 女主角刻画、M3 事件与时间已完成；M3.5 多轮场景待启动
+- 状态：M1 骨架、M2 女主角刻画、M3 事件与时间、M3.5 多轮场景已完成；M4 记忆系统待启动
 - 项目目录：`D:\Projects\New Idea`（代码直接建于此目录；本文档为唯一真相源）
 - 本文档随决策更新
 
@@ -119,7 +119,8 @@ FastAPI
   1. **进入**：每次交互后 / 时间推进结算时 / 手动评估进入条件；**同一时刻仅 1 个活跃场景**，已有活跃场景时候选跳过；写 `save_flags.active_scene = {key, turns:0, goal, started_game_minutes}`，写 `scene_logs(started)`，并注入一条轻量 `event` 消息（场景标题 + 环境一句，模板生成、不耗 AI）
   2. **持续**：每轮 prompt 注入「当前场景」块——场景名、地点氛围、本幕目标、已进行轮数（不注入结束条件，防 AI 应付）；`turns` 每轮 +1
   3. **结束**（任一触发）：AI 在 STATE 标签输出 `"scene":{"action":"end","summary":"..."}`；`turns >= max_turns` 时下一轮注入收尾指令、回复落库后强制结算；或 exit 条件满足由服务端判定；`turns < min_turns` 时忽略 AI 的提前收尾
-  4. **结算**（同一事务）：应用 effects → 写 `scene_logs(finished, summary)` → 生成场景记忆（kind=event/relationship，importance 可配）→ 清 `active_scene` → 评估 next_scenes 解锁
+  4. **结算**（同一事务）：应用 effects → 写 `scene_logs(finished, summary)` → 生成场景记忆（kind=event/relationship，importance 可配）→ 清 `active_scene` → 解锁 next_scenes；调试中止记 aborted（不应用 effects 与记忆）
+- **进入评估时机**：每次结算（对话/推进/手动事件）末尾统一评估；本次结算中刚结束一幕则不再接力进入（下一次结算再评估），防止连续跳幕
 - **与事件系统互通**：事件 effects 可 `{"start_scene":"..."}`；场景结束 effects 可触发/解锁事件——事件链升级为「事件 ⇄ 场景」混合链
 - **手动干预**：主界面显示当前场景（名称 + 第几轮 + 目标），支持「结束当前场景」（正常收尾）与调试强制进入/中止（`scene_logs` 记 aborted）
 - **配置项**：`SCENE_MAX_TURNS_DEFAULT` / 场景块字符预算 / 场景结束记忆 importance 默认值
@@ -249,7 +250,7 @@ FastAPI
 New Idea/（= D:\Projects\New Idea）
 ├─ backend/
 │  ├─ main.py config.py db.py orm.py schemas.py ai_client.py
-│  ├─ game/  clock.py attributes.py events.py scene.py prompt.py tags.py memory.py
+│  ├─ game/  clock.py attributes.py events.py scenes.py prompt.py tags.py memory.py
 │  ├─ routes/ saves.py chat.py state.py events.py scenes.py advance.py defs.py memories.py catalog.py
 │  └─ seeds/ 内置女主角·默认属性·事件·场景 JSON
 ├─ frontend/

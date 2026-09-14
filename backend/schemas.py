@@ -49,6 +49,19 @@ class AdvanceIn(BaseModel):
     target: dict | None = None
 
 
+class SceneEnterIn(BaseModel):
+    """手动进入场景（调试）：场景 key。"""
+
+    key: str = Field(min_length=1, max_length=64)
+
+
+class SceneEndIn(BaseModel):
+    """手动结束当前场景：summary 为收尾总结，abort 为强制中止（调试）。"""
+
+    summary: str = Field(default="", max_length=2000)
+    abort: bool = False
+
+
 class AttributeDefIn(BaseModel):
     key: str = Field(min_length=1, max_length=64, pattern=r"^[a-z][a-z0-9_]{0,63}$")
     name: str = Field(min_length=1, max_length=64)
