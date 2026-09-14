@@ -8,16 +8,20 @@ from __future__ import annotations
 import asyncio
 import json
 import unittest
+from datetime import datetime
 from unittest import mock
 from urllib.parse import quote_plus
 
 import pymysql
+from fastapi import HTTPException
 from pydantic import ValidationError
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 import routes.advance as advance_route
+import routes.backup as backup_route
 import routes.chat as chat_route
+import routes.defs as defs_route
 import routes.events as events_route
 import routes.scenes as scenes_route
 import routes.state as state_route
@@ -44,10 +48,19 @@ from orm import (
     Message,
     Provider,
     Save,
+    SaveFlag,
     SceneDef,
     SceneLog,
 )
-from schemas import AdvanceIn, SceneEndIn, SceneEnterIn
+from schemas import (
+    AdvanceIn,
+    EventDefIn,
+    EventDefPatch,
+    SceneDefIn,
+    SceneDefPatch,
+    SceneEndIn,
+    SceneEnterIn,
+)
 from seeds.loader import apply_event_seeds, apply_scene_seeds
 
 TEST_DATABASE = f"{MYSQL_DATABASE}_test"
@@ -763,6 +776,251 @@ class SettlementIntegrationTest(unittest.TestCase):
             select(SceneDef).where(SceneDef.key == "date_first_outing")
         )
         self.assertFalse(row.enabled)
+
+    def test_export_backup_roundtrip(self):
+        session = self._session()
+        defs = self._defs(session)
+        self._add_provider(session)
+        save, _values = self._save(session, defs, model_key="testprov:model-a")
+        save_id = save.id
+        save.game_minutes = 123
+        session.add(
+            EventDef(
+                key="evt_x", name="事件X", category="fixed", trigger={},
+                effects={}, prompt_template="内容", once=False,
+                cooldown_minutes=0, priority=0, enabled=True,
+            )
+        )
+        session.flush()
+        event_id = session.scalar(select(EventDef.id).where(EventDef.key == "evt_x"))
+        message_ids: list[int] = []
+        for index in range(5):
+            message = Message(
+                save_id=save_id,
+                role="user" if index % 2 == 0 else "assistant",
+                content=f"消息{index}",
+                meta={},
+                game_minutes_at=index,
+            )
+            session.add(message)
+            session.flush()
+            message_ids.append(message.id)
+        save.last_summarized_message_id = message_ids[-1]
+        session.add(SaveFlag(save_id=save_id, key="flag_a", value={"value": True}))
+        session.add(
+            EventLog(
+                save_id=save_id, event_id=event_id, status="triggered",
+                content="日志", meta={"key": "evt_x", "name": "事件X"},
+                game_minutes_at=3,
+            )
+        )
+        session.add(
+            SceneLog(
+                save_id=save_id, scene_key="scene_x", status="finished",
+                summary="总结", meta={"name": "场景X"}, game_minutes_at=4,
+                finished_at=datetime.now(),
+            )
+        )
+        session.add(
+            Memory(
+                save_id=save_id, kind="event", content="记忆内容", importance=6,
+                source_from_id=message_ids[0], source_to_id=message_ids[-1],
+            )
+        )
+        session.commit()
+
+        payload = backup_route.build_backup(session, save)
+        self.assertEqual(payload["format"], backup_route.BACKUP_FORMAT)
+        self.assertEqual(payload["save"]["game_minutes"], 123)
+        self.assertEqual(
+            [m["content"] for m in payload["messages"]],
+            [f"消息{i}" for i in range(5)],
+        )
+        self.assertTrue(any(f["key"] == "flag_a" for f in payload["flags"]))
+
+        response = backup_route.export_save(save_id, session=session)
+        self.assertIn("attachment", response.headers["content-disposition"])
+        self.assertEqual(json.loads(response.body)["save"]["name"], "测试档")
+
+        imported = backup_route.import_backup(session, payload, name="恢复档")
+        session.commit()
+        self.assertNotEqual(imported.id, save_id)
+        self.assertEqual(imported.name, "恢复档")
+        self.assertEqual(imported.model_key, "testprov:model-a")
+        self.assertEqual(imported.game_minutes, 123)
+        new_messages = list(
+            session.scalars(
+                select(Message)
+                .where(Message.save_id == imported.id)
+                .order_by(Message.id)
+            )
+        )
+        self.assertEqual(
+            [m.content for m in new_messages], [f"消息{i}" for i in range(5)]
+        )
+        self.assertEqual(imported.last_summarized_message_id, new_messages[-1].id)
+        self.assertTrue(events.load_flags(session, imported.id).get("flag_a"))
+        log = session.scalar(
+            select(EventLog).where(EventLog.save_id == imported.id)
+        )
+        self.assertEqual(log.event_id, event_id)
+        scene_log = session.scalar(
+            select(SceneLog).where(SceneLog.save_id == imported.id)
+        )
+        self.assertEqual(scene_log.scene_key, "scene_x")
+        memory_row = session.scalar(
+            select(Memory).where(Memory.save_id == imported.id)
+        )
+        self.assertEqual(memory_row.content, "记忆内容")
+        self.assertEqual(memory_row.source_from_id, new_messages[0].id)
+        self.assertEqual(memory_row.source_to_id, new_messages[-1].id)
+
+    def test_import_backup_rejects_invalid_format(self):
+        session = self._session()
+        defs = self._defs(session)
+        self._save(session, defs)
+        session.commit()
+        with self.assertRaises(HTTPException) as invalid:
+            backup_route.import_backup(session, {"format": "nope", "version": 1})
+        self.assertEqual(invalid.exception.status_code, 400)
+        with self.assertRaises(HTTPException) as version:
+            backup_route.import_backup(
+                session, {"format": backup_route.BACKUP_FORMAT, "version": 99}
+            )
+        self.assertEqual(version.exception.status_code, 400)
+
+    def test_import_backup_clears_unknown_model_key(self):
+        session = self._session()
+        defs = self._defs(session)
+        self._save(session, defs)
+        session.commit()
+        payload = {
+            "format": backup_route.BACKUP_FORMAT,
+            "version": backup_route.BACKUP_VERSION,
+            "save": {"name": "旧档", "model_key": "ghost:model", "game_minutes": 5},
+        }
+        imported = backup_route.import_backup(session, payload)
+        session.commit()
+        self.assertEqual(imported.model_key, "")
+        self.assertEqual(imported.name, "旧档（恢复）")
+        self.assertEqual(imported.game_minutes, 5)
+
+    def test_event_def_crud(self):
+        session = self._session()
+        defs = self._defs(session)
+        self._save(session, defs)
+        session.commit()
+
+        created = defs_route.create_event_def(
+            EventDefIn(
+                key="custom_evt",
+                name="自定义事件",
+                category="manual",
+                cost={"money": 10},
+                effects={"attrs": {"mood": 1}},
+                prompt_template="文本",
+            ),
+            session=session,
+        )
+        self.assertEqual(created["key"], "custom_evt")
+        self.assertFalse(created["from_seed"])
+        self.assertIn(
+            "custom_evt",
+            [item["key"] for item in defs_route.list_event_defs(session=session)],
+        )
+
+        updated = defs_route.update_event_def(
+            created["id"], EventDefPatch(name="改名", enabled=False), session=session
+        )
+        self.assertEqual(updated["name"], "改名")
+        self.assertFalse(updated["enabled"])
+
+        with self.assertRaises(HTTPException) as duplicate:
+            defs_route.create_event_def(
+                EventDefIn(key="custom_evt", name="重复"), session=session
+            )
+        self.assertEqual(duplicate.exception.status_code, 409)
+        with self.assertRaises(HTTPException) as category:
+            defs_route.create_event_def(
+                EventDefIn(key="bad_evt", name="非法分类", category="nope"),
+                session=session,
+            )
+        self.assertEqual(category.exception.status_code, 400)
+
+        defs_route.delete_event_def(created["id"], session=session)
+        self.assertNotIn(
+            "custom_evt",
+            [item["key"] for item in defs_route.list_event_defs(session=session)],
+        )
+
+    def test_scene_def_crud_and_turn_validation(self):
+        session = self._session()
+        defs = self._defs(session)
+        self._save(session, defs)
+        session.commit()
+
+        created = defs_route.create_scene_def(
+            SceneDefIn(
+                key="custom_scene",
+                name="自定义场景",
+                min_turns=2,
+                max_turns=5,
+                next_scenes=["a", " b ", ""],
+            ),
+            session=session,
+        )
+        self.assertEqual(created["next_scenes"], ["a", "b"])
+        self.assertFalse(created["from_seed"])
+
+        with self.assertRaises(HTTPException) as turns:
+            defs_route.update_scene_def(
+                created["id"], SceneDefPatch(min_turns=6), session=session
+            )
+        self.assertEqual(turns.exception.status_code, 400)
+
+        updated = defs_route.update_scene_def(
+            created["id"], SceneDefPatch(max_turns=10), session=session
+        )
+        self.assertEqual(updated["max_turns"], 10)
+
+        defs_route.delete_scene_def(created["id"], session=session)
+        self.assertNotIn(
+            "custom_scene",
+            [item["key"] for item in defs_route.list_scene_defs(session=session)],
+        )
+
+    def test_debug_trigger_fixed_event(self):
+        session = self._session()
+        defs = self._defs(session)
+        save, _values = self._save(session, defs)
+        session.add(
+            EventDef(
+                key="fixed_dbg", name="固定调试", category="fixed",
+                trigger={},
+                effects={"attrs": {"trust": 3}}, prompt_template="调试内容",
+                once=False, cooldown_minutes=0, priority=0, enabled=True,
+            )
+        )
+        session.commit()
+        save_id = save.id
+
+        with self.assertRaises(HTTPException) as blocked:
+            events_route.trigger_manual(
+                save_id, "fixed_dbg", debug=False, session=session
+            )
+        self.assertEqual(blocked.exception.status_code, 400)
+
+        data = events_route.trigger_manual(
+            save_id, "fixed_dbg", debug=True, session=session
+        )
+        self.assertEqual(data["event"]["key"], "fixed_dbg")
+        session.commit()
+        self.assertEqual(load_attr_values(session, save_id)["trust"], 13.0)
+        logs = list(
+            session.scalars(select(EventLog).where(EventLog.save_id == save_id))
+        )
+        self.assertEqual(len(logs), 1)
+        self.assertEqual((logs[0].meta or {}).get("source"), "debug")
 
 
 class ErrorFormatTest(unittest.TestCase):

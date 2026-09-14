@@ -22,6 +22,7 @@ from config import ALLOWED_ORIGINS, APP_HOST, APP_PORT, BASE_DIR, FRONTEND_DIR
 from db import SessionLocal, init_db
 from game import memory
 from routes.advance import router as advance_router
+from routes.backup import router as backup_router
 from routes.catalog import router as catalog_router
 from routes.character import router as character_router
 from routes.chat import router as chat_router
@@ -90,6 +91,7 @@ app.add_middleware(
 
 app.include_router(character_router)
 app.include_router(saves_router)
+app.include_router(backup_router)
 app.include_router(chat_router)
 app.include_router(state_router)
 app.include_router(defs_router)

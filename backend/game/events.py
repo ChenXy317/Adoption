@@ -670,12 +670,14 @@ def settle_time(
     rng: random.Random | None = None,
     state_scene: dict | None = None,
     skip_scene_enter: bool = False,
+    exclude_events: set[str] | None = None,
 ) -> dict:
     """推进到目标游戏分钟并结算：tick → 跨日随机判定 → 事件触发 → 场景生命周期。
 
     同一事务内完成，最终 commit 由调用方负责。values 会被就地更新为最终属性值。
     ordered_changes 按实际应用顺序记录全部属性变化（供前端按序覆盖）；
-    skip_scene_enter 供「本幕刚结束」的调用方使用，避免同一次结算内接力进入新场景。
+    skip_scene_enter 供「本幕刚结束」的调用方使用，避免同一次结算内接力进入新场景；
+    exclude_events 供手动/调试触发的调用方排除本次已单独结算的事件。
     """
     rng = rng or random.Random()
     defs_map = {d.key: d for d in defs}
@@ -713,7 +715,7 @@ def settle_time(
         if not rolled_today and today_start not in pending_days:
             pending_days.insert(0, today_start)
 
-    exclude: set[str] = set()
+    exclude: set[str] = set(exclude_events or ())
     rounds = 0
     while rounds < 4 and len(triggered_results) < EVENT_MAX_PER_SETTLEMENT:
         rounds += 1

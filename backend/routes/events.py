@@ -60,14 +60,18 @@ def list_events(
 
 @router.post("/api/saves/{save_id}/events/{event_key}/trigger")
 def trigger_manual(
-    save_id: int, event_key: str, session: Session = Depends(get_session)
+    save_id: int,
+    event_key: str,
+    debug: bool = Query(default=False),
+    session: Session = Depends(get_session),
 ):
+    """手动触发（行动菜单）；debug=true 时允许任意分类并跳过条件/余额校验（调试用）。"""
     with save_settle_lock(save_id):
         save = get_save_or_error(session, save_id)
         event = session.scalar(select(EventDef).where(EventDef.key == event_key))
         if event is None:
             error("event_not_found", f"事件不存在：{event_key}", 404)
-        if event.category not in ("manual", "work"):
+        if event.category not in ("manual", "work") and not debug:
             error("not_manual", "该事件不是手动事件，无法从行动菜单触发", 400)
 
         settings = save.settings or {}
@@ -78,22 +82,23 @@ def trigger_manual(
         now_abs = clock.absolute_minutes(save.game_minutes, settings)
         since = {key: max(0, now_abs - at) for key, at in last_at.items()}
         ctx = events.build_context(session, save, values, minutes_since=since)
-        ok, reason = events.availability(
-            event,
-            ctx,
-            triggered=event.id in triggered_ids,
-            minutes_since=since.get(event.key),
-            allow_chance=False,
-        )
-        if not ok:
-            error(
-                "event_locked",
-                events.MANUAL_REASON_TEXT.get(reason, "当前不可用"),
-                409,
+        if not debug:
+            ok, reason = events.availability(
+                event,
+                ctx,
+                triggered=event.id in triggered_ids,
+                minutes_since=since.get(event.key),
+                allow_chance=False,
             )
-        ok, reason = events.check_cost(values, event.cost or {})
-        if not ok:
-            error("insufficient_money", "金钱不足，无法承担这项花费", 400)
+            if not ok:
+                error(
+                    "event_locked",
+                    events.MANUAL_REASON_TEXT.get(reason, "当前不可用"),
+                    409,
+                )
+            ok, reason = events.check_cost(values, event.cost or {})
+            if not ok:
+                error("insufficient_money", "金钱不足，无法承担这项花费", 400)
 
         cost = event.cost or {}
         try:
@@ -112,6 +117,13 @@ def trigger_manual(
             values.update(updated)
             events.write_changes(session, save_id, values, cost_changes)
 
+        if debug:
+            source = "debug"
+        elif event.category == "work":
+            source = "work"
+        else:
+            source = "manual"
+
         old_game = int(save.game_minutes)
         result = events.apply_event(
             session,
@@ -120,7 +132,7 @@ def trigger_manual(
             ctx,
             values,
             defs_map,
-            source="work" if event.category == "work" else "manual",
+            source=source,
             extra_advance=cost_time,
             extra_meta={"cost": cost, "cost_attrs": cost_changes},
         )
@@ -130,7 +142,8 @@ def trigger_manual(
             defs,
             values,
             save.game_minutes + result["advance_minutes"],
-            source="manual",
+            source=source,
+            exclude_events={event.key},
         )
         note = None
         if int(save.game_minutes) > old_game:

@@ -8,6 +8,8 @@
       <div class="row">
         <span class="time">{{ game.current?.virtual?.label || "" }}</span>
         <button class="btn" @click="memoryOpen = true">记忆</button>
+        <button class="btn" @click="defsOpen = true">定义</button>
+        <button class="btn" @click="themeOpen = true">主题</button>
         <button class="btn" @click="catalogOpen = true">模型配置</button>
       </div>
     </header>
@@ -54,6 +56,8 @@
 
     <ModelCatalogModal v-if="catalogOpen" @close="onCatalogClose" />
     <MemoryPanel v-if="memoryOpen" :save-id="$route.params.id" @close="memoryOpen = false" />
+    <DefsPanel v-if="defsOpen" @close="defsOpen = false" />
+    <ThemeModal v-if="themeOpen" @close="themeOpen = false" />
   </div>
 </template>
 
@@ -65,11 +69,13 @@ import ActionPanel from "../components/ActionPanel.vue";
 import AdvancePanel from "../components/AdvancePanel.vue";
 import ChatInput from "../components/ChatInput.vue";
 import ChatStream from "../components/ChatStream.vue";
+import DefsPanel from "../components/DefsPanel.vue";
 import EventPanel from "../components/EventPanel.vue";
 import MemoryPanel from "../components/MemoryPanel.vue";
 import ModelCatalogModal from "../components/ModelCatalogModal.vue";
 import SceneBanner from "../components/SceneBanner.vue";
 import StatusBars from "../components/StatusBars.vue";
+import ThemeModal from "../components/ThemeModal.vue";
 import WalletPanel from "../components/WalletPanel.vue";
 import { useChatStore } from "../stores/chat";
 import { useGameStore } from "../stores/game";
@@ -85,6 +91,8 @@ const chat = useChatStore();
 const ui = useUiStore();
 const catalogOpen = ref(false);
 const memoryOpen = ref(false);
+const defsOpen = ref(false);
+const themeOpen = ref(false);
 
 const characterLine = computed(() => {
   const c = game.current?.character;

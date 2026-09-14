@@ -4,9 +4,22 @@
       <h1>养成</h1>
       <div class="row">
         <button class="btn" @click="catalogOpen = true">模型配置</button>
+        <button class="btn" @click="defsOpen = true">定义管理</button>
+        <button class="btn" @click="themeOpen = true">主题</button>
+        <button class="btn" :disabled="importing" @click="triggerImport">
+          {{ importing ? "导入中…" : "导入存档" }}
+        </button>
         <button class="btn primary" @click="createOpen = true">+ 新建存档</button>
       </div>
     </header>
+
+    <input
+      ref="fileInput"
+      type="file"
+      accept="application/json,.json"
+      style="display: none"
+      @change="onImportFile"
+    />
 
     <main class="grid">
       <div v-if="game.loading" class="dim">加载中…</div>
@@ -25,10 +38,13 @@
           @click="enter(save)"
         >
           <div class="row" style="justify-content: space-between">
-            <strong>{{ save.name }}</strong>
-            <button class="btn danger small-btn" @click.stop="remove(save)">
-              删除
-            </button>
+            <strong class="save-name">{{ save.name }}</strong>
+            <div class="row">
+              <button class="btn small-btn" @click.stop="exportSave(save)">导出</button>
+              <button class="btn danger small-btn" @click.stop="remove(save)">
+                删除
+              </button>
+            </div>
           </div>
           <div class="dim">
             {{ save.character?.name || "未关联女主角" }}
@@ -51,6 +67,8 @@
       @created="onCreated"
     />
     <ModelCatalogModal v-if="catalogOpen" @close="catalogOpen = false" />
+    <DefsPanel v-if="defsOpen" @close="defsOpen = false" />
+    <ThemeModal v-if="themeOpen" @close="themeOpen = false" />
   </div>
 </template>
 
@@ -58,8 +76,11 @@
 import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
+import { apiPost } from "../api/client";
+import DefsPanel from "../components/DefsPanel.vue";
 import ModelCatalogModal from "../components/ModelCatalogModal.vue";
 import SaveCreateModal from "../components/SaveCreateModal.vue";
+import ThemeModal from "../components/ThemeModal.vue";
 import { useCatalogStore } from "../stores/catalog";
 import { useGameStore } from "../stores/game";
 import { useUiStore } from "../stores/ui";
@@ -70,6 +91,10 @@ const catalog = useCatalogStore();
 const ui = useUiStore();
 const createOpen = ref(false);
 const catalogOpen = ref(false);
+const defsOpen = ref(false);
+const themeOpen = ref(false);
+const fileInput = ref(null);
+const importing = ref(false);
 
 onMounted(async () => {
   try {
@@ -81,6 +106,43 @@ onMounted(async () => {
 
 function enter(save) {
   router.push(`/game/${save.id}`);
+}
+
+function exportSave(save) {
+  const link = document.createElement("a");
+  link.href = `/api/saves/${save.id}/export`;
+  link.download = "";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
+function triggerImport() {
+  fileInput.value?.click();
+}
+
+async function onImportFile(event) {
+  const file = event.target.files?.[0];
+  event.target.value = "";
+  if (!file) return;
+  importing.value = true;
+  try {
+    const text = await file.text();
+    let payload;
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      throw new Error("备份文件不是有效的 JSON");
+    }
+    const save = await apiPost("/api/saves/import", payload);
+    await game.loadSaves();
+    ui.toast("ok", `已导入存档「${save.name}」`);
+    router.push(`/game/${save.id}`);
+  } catch (e) {
+    ui.toast("error", e.message);
+  } finally {
+    importing.value = false;
+  }
 }
 
 function onCreated(save) {
@@ -134,6 +196,12 @@ async function remove(save) {
 .save-card:hover {
   border-color: var(--accent);
   transform: translateY(-2px);
+}
+
+.save-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .empty {

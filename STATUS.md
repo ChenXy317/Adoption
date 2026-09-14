@@ -1,6 +1,6 @@
 # STATUS — 当前状态记录
 
-> 更新时间：2026-09-14（M4 后审查修复已提交 `75fdcce`；M5 行动与经济已提交 `a953e5e`；M5 后全量审查修复已提交 `bab2d80`）
+> 更新时间：2026-09-14（M5 后审查修复已提交 `bab2d80`；M6 打磨已完成，待提交）
 > 用途：跨会话交接。新会话先读 `PLAN.md`（唯一真相源）+ 本文件，再动手。
 
 ## 一、项目速览
@@ -23,7 +23,7 @@
 | M4 后全量审查修复（结算顺序、场景接力、总结任务兜底、集成测试） | 已完成，已提交 `75fdcce` |
 | M5 行动与经济（打工+钱包、送礼两档、冷落、性格倾向、主动消息、事件链） | 已完成，已提交 `a953e5e` |
 | M5 后全量审查修复（场景冷却、总结兜底、STATE 协议闭环、断流竞态、参数防御、种子启停） | 已完成，已提交 `bab2d80` |
-| M6 打磨 | 未开工（下一步） |
+| M6 打磨（导出/恢复、定义管理界面与调试触发、暗/亮主题） | 已完成，待提交 |
 
 ## 三、运行方式
 
@@ -80,7 +80,7 @@
 
 测试与文档
 - 新增 `tests/test_integration.py`（9 项，使用独立 `new_idea_test` 库、自动建删）：结算 tick/固定事件/跨日随机、场景生命周期与不接力、手动结束不接力、advance 时间说明、对话结算（含解析失败兜底）、记忆总结流水线与失败落库、422 错误格式
-- `PLAN.md` §5.3/§7/§9 明确：事件/场景定义 CRUD 推迟（当前以种子文件维护，列入 M6 之后）
+- `PLAN.md` §5.3/§7/§9 明确：事件/场景定义 CRUD 曾推迟（已由 M6 完成，见上）
 
 **M5 行动与经济（已提交 `a953e5e`）**
 
@@ -117,12 +117,30 @@
 测试
 - 新增 `tests/test_ai_client.py`（参数组装 5 项）；`test_game.py` 补 STATE 协议覆盖；`test_integration.py` 新增 4 项（场景冷却起点、总结准备失败落库、事件/场景种子启停保留）
 
+**M6 打磨（待提交）**
+
+后端
+- `routes/backup.py`（新）：`GET /api/saves/{id}/export` 导出全量 JSON（存档元数据、属性、标记、消息、事件/场景日志、记忆、角色快照，附件文件名 RFC 5987）；`POST /api/saves/import` 导入为新存档（消息 id 重映射、`last_summarized_message_id` 与记忆来源映射、event_key 重新关联定义、未知 model_key 置空、非法格式/版本 400、消息条数上限）
+- `main.py`：注册备份路由
+- `routes/defs.py`：新增 `/api/event-defs`、`/api/scene-defs` CRUD（key 创建后不可改、事件分类白名单、min/max 轮数校验、`from_seed` 内置标记）；`routes/events.py` 的 manual 触发支持 `?debug=true`（任意分类、跳过条件与余额校验、source=debug）；`game/events.py` 的 `settle_time` 新增 `exclude_events`（避免手动/调试触发的事件在同一次结算中被重复收集）
+- `schemas.py`：`EventDefIn/Patch`、`SceneDefIn/Patch`
+
+前端
+- `views/Home.vue`：存档卡片「导出」（附件下载，实现于点击处 `@click.stop`）；顶栏「导入存档」（文件选择 → POST → 跳转新档）、「定义管理」、「主题」入口
+- `components/DefsPanel.vue`（新）：事件/场景定义管理弹层（列表、编辑表单、JSON 字段、启停、新建/删除、内置标记、对存档调试触发）
+- `components/ThemeModal.vue`（新）+ `stores/ui.js` 主题状态与 localStorage 持久化 + `styles/base.css` 亮色变量；`main.js` 启动应用主题；`views/Game.vue` 接入两个入口
+
+测试
+- `test_integration.py` 新增 6 项：导出导入往返、非法格式与版本拒绝、未知模型 key 置空、事件定义 CRUD（重复 key/非法分类）、场景定义 CRUD（轮数校验）、debug 触发（分类拦截、效果只应用一次、source=debug）
+
 ## 六、验证记录（2026-09-14）
 
 - `unittest` **107 项**全过（纯函数 93 + DB 集成 14）；`npm run build` 通过
 - httpx 端到端（真实模型 aihubmix，临时档已清理，21 项全过）：22 条消息 → 达阈值登记 pending 任务 → 总结新增 6 条（抽取质量抽检良好）→ 进度推进 / 未总结清零 / 任务 done → 记忆 CRUD → prompt 注入「长期记忆」且召回计数更新 → 模型缺失时失败状态落库
 - 浏览器实测：记忆弹层打开（未总结 22 条）→ 手动总结 → 6 条记忆上屏 → 归档 → 恢复
 - 审查修复复验（2026-09-14）：`unittest` **117 项**全过（纯函数 99 + DB 集成 18，新增 10 项）；`npm run build` 通过；httpx 端到端（真实模型 aihubmix，临时档已清理，20 项全过）：SSE 链路、`tendency` 字符串、事件触发与时间推进、时间说明均正常
+- M6 导出恢复验证（2026-09-14）：`unittest` **120 项**全过（新增 3 项）；`npm run build` 通过；httpx 端到端（正式档只读导出 → 导入 → 消息/属性/时间一致性校验 → 清理，15 项全过）；浏览器实测首页「导入存档」上传备份 → 跳转新档且 6 条消息与属性完整恢复 → 返回列表双档显示 → 测试档已清理
+- M6 定义管理/主题验证（2026-09-14）：`unittest` **123 项**全过（新增 3 项）；`npm run build` 通过；httpx 端到端（定义 CRUD、调试触发与清理，16 项全过）；浏览器实测定义弹层（24 事件/3 场景、内置标记、编辑表单渲染正确）、亮/暗主题切换与 localStorage 持久化；期间修复 debug 触发 fixed 事件被同次结算重复收集的缺陷
 
 ## 七、关键决策速查（M4 实现口径）
 
@@ -140,12 +158,12 @@
 - **M5 口径**：打工 = `category="work"` 的确定性事件（时间换钱、固定模板消息、不走 AI）；送礼/消费 = manual 事件（cost + effects + 专属 prompt_template，AI 在下一轮对话承接演出）；冷落 = 距上次 user/assistant 消息 ≥3 游戏日，按超时天数增量扣好感（-1/日、单次上限 -5、`save_flags.neglect` 记录已扣天数，对话后自动重置）；倾向 = `tendency_of(属性, 互动计数)`；主动消息 = 带 period/hour 条件的 fixed 事件（随推进返回并上前端）
 - **AI flags 白名单**：仅允许 `^[a-z][a-z0-9_]{0,63}$`，拒绝 `active_scene`/`random_rolls`/`neglect`/`mood_label` 与 `scene_`/`event_` 前缀；`mood_label` 单独存 flag 并注入 prompt
 
-## 八、下一步 M6（打磨）建议顺序
+## 八、M6（打磨）完成情况
 
-1. 轻量导出备份（存档 JSON 全量导出/恢复，PLAN §9 M6）
-2. 事件/场景定义管理界面（PLAN §5.3/§7 推迟项：event-defs/scene-defs CRUD + EventDefEditor/SceneDefEditor）
-3. 主题（ThemeModal）与 README 收尾；向量检索（可选）
-4. 如需扩展 M5：付费手动事件触发后立即 AI 演出（当前为事件消息 + 下一轮承接）、更多打工/礼物种子
+1. 轻量导出备份 — 已完成（`GET /api/saves/{id}/export` + `POST /api/saves/import`，首页「导出」「导入存档」）
+2. 事件/场景定义管理界面 — 已完成（defs CRUD + DefsPanel 弹层 + 调试触发）
+3. 主题与 README 收尾 — 已完成（暗/亮主题，持久化；README/PLAN 已更新）
+4. 可选后置 — 未做：向量检索（embedding top-K）、M5 扩展（付费事件即时 AI 演出、更多打工/礼物种子）
 
 ## 九、环境坑与约定（踩过的雷）
 
@@ -163,7 +181,8 @@
 
 ## 十、给下一个会话的建议
 
-- 动手前：读 `PLAN.md` + 本文件 → `git status`（当前工作树干净，M4 审查修复与 M5 均已提交）→ 可直接开工 M6
+- 动手前：读 `PLAN.md` + 本文件 → `git status`（M5 后审查修复已提交 `bab2d80`；M6 打磨已完成，待提交）
+- 可选后置项：向量检索（embedding top-K）、M5 扩展（付费事件即时 AI 演出、更多打工/礼物种子）；新增事件/场景可直接用「定义管理」界面或种子文件
 - 后端改动需重启服务（未开 reload）；前端改动需 `npm run build`
 - 验证习惯：先 `unittest` → 再 httpx 端到端（含 SSE/真实模型）→ 最后浏览器实测
 - 聊天验证注意选可用模型（aihubmix 的 `xiaomi-mimo-v2.5-free`）；总结同样走该模型（或配 `MEMORY_MODEL`）

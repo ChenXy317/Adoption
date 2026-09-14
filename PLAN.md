@@ -5,7 +5,7 @@
 > 时间与现实完全隔离：纯虚拟时钟，由对话/行动推进；经济系统（金钱/打工/消费）作为互动燃料。
 > **定位：单女主、深刻画的 galgame 式体验（方向参考 Teaching Feeling）。女主角全局唯一（跨存档共享设定书）；存档 = 从头来过的周目。核心日常循环：照顾/陪伴互动 → 状态与关系渐变（警戒降、信任升）→ 时间推进 → 阶段解锁新互动与特殊事件。优先角色刻画深度，分支/日程等玩法后置。**
 
-- 状态：M1 骨架、M2 女主角刻画、M3 事件与时间、M3.5 多轮场景、M4 记忆系统、M5 行动与经济已完成；M6 打磨待启动
+- 状态：M1–M5 已完成；M6 打磨已完成（导出/恢复、事件/场景定义管理界面、主题；向量检索为可选后置）
 - 项目目录：`D:\Projects\New Idea`（代码直接建于此目录；本文档为唯一真相源）
 - 本文档随决策更新
 
@@ -109,7 +109,7 @@ FastAPI
 - cost JSON（manual 专用）：`{"money":80,"time_minutes":180}`
 - 时机：每次交互后 + 时间推进结算时（含跨日随机判定）+ 手动触发；离线世界静止，无需页面加载评估
 - manual 事件：点击 → 校验条件与余额 → 扣 cost → 注入场景 prompt 由 AI 叙述，落 `event_logs` 与消息
-- 管理界面：事件/场景定义 CRUD + 启停 + 调试手动触发（**推迟**：当前以种子文件维护，接口与编辑器列入 M6 之后）
+- 管理界面：事件/场景定义 CRUD + 启停 + 调试手动触发（已实现；内置定义以种子为真相源，重启恢复字段，启停状态保留）
 
 **多轮场景（scene）**：
 
@@ -219,7 +219,7 @@ FastAPI
 
 - 视图：`Home`（存档宫格）、`Game`（主界面）
 - Game 布局：顶栏（虚拟日期·时段·节日·设置·推进入口）｜中央（角色状态卡 + 对话流 + 输入区）｜右栏（属性面板+飘字、钱包板块、行动面板、事件面板）
-- 组件：ChatStream、MessageBubble、StatusBars、SceneBanner（当前场景条：名称/轮数/目标/结束）、WalletPanel、ActionPanel（行动菜单：日常互动/送礼/打工）、EventCard、EventDefEditor、SceneDefEditor、AdvancePanel（调试）、MemoryPanel、ModelCatalogModal、ThemeModal、Toast
+- 组件：ChatStream、MessageBubble、StatusBars、SceneBanner（当前场景条：名称/轮数/目标/结束）、WalletPanel、ActionPanel（行动菜单：日常互动/送礼/打工）、EventPanel（最近事件）、AdvancePanel（调试）、MemoryPanel、ModelCatalogModal、DefsPanel（事件/场景定义管理）、ThemeModal（主题）、Toast
 - 参考 Nehchat 重写（非直接复制）：`sse.js`、`api.js` 指数退避、主题/弹层/Toast、catalog 交互模式；源码为 vanilla JS + 全局 state，一律按 Vue composable + Pinia 重写
 
 ## 7. API 一览（要点）
@@ -227,14 +227,18 @@ FastAPI
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | CRUD | `/api/saves` | 存档管理（含选模型 model_key、生成参数） |
+| GET | `/api/saves/{id}/export` | 存档全量导出（JSON 备份文件下载） |
+| POST | `/api/saves/import` | 导入备份为新存档（不改动原档；`?name=` 可选） |
 | POST | `/api/saves/{id}/chat` | SSE 对话（含推进结算+事件评估） |
 | GET | `/api/saves/{id}/state` | 属性+虚拟时间+激活事件+当前场景+金钱 |
 | POST | `/api/saves/{id}/advance` | 显式推进时间（动作/调试） |
 | GET/POST | `/api/saves/{id}/events` | 事件日志（GET）；手动触发见下一行 |
-| POST | `/api/saves/{id}/events/{key}/trigger` | manual 事件触发（校验 cost） |
+| POST | `/api/saves/{id}/events/{key}/trigger` | manual 事件触发（校验 cost）；`?debug=true` 允许任意分类并跳过条件校验（调试） |
 | GET/POST | `/api/saves/{id}/scenes` | 场景历史 / 手动进入（调试） |
 | POST | `/api/saves/{id}/scenes/end` | 手动结束当前场景（正常收尾） |
-| CRUD | `/api/attribute-defs` | 属性定义管理（`/api/event-defs`、`/api/scene-defs` 推迟，见 §5.3） |
+| CRUD | `/api/attribute-defs` | 属性定义管理 |
+| CRUD | `/api/event-defs` | 事件定义管理（含 from_seed 内置标记） |
+| CRUD | `/api/scene-defs` | 场景定义管理（含 from_seed 内置标记） |
 | GET/POST/PATCH/DELETE | `/api/saves/{id}/memories` | 记忆管理 |
 | POST | `/api/saves/{id}/memories/summarize` | 手动总结 |
 | GET | `/api/character` | 女主角设定书（内置内容，只读） |

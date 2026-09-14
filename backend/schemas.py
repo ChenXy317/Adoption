@@ -102,6 +102,74 @@ class AttributeDefPatch(BaseModel):
     enabled: bool | None = None
 
 
+class EventDefIn(BaseModel):
+    """事件定义（新建）；key 创建后不可改。"""
+
+    key: str = Field(min_length=1, max_length=64, pattern=r"^[a-z][a-z0-9_]{0,63}$")
+    name: str = Field(min_length=1, max_length=64)
+    category: str = Field(default="fixed", max_length=32)
+    trigger: dict = Field(default_factory=dict)
+    cost: dict = Field(default_factory=dict)
+    effects: dict = Field(default_factory=dict)
+    prompt_template: str = Field(default="", max_length=8000)
+    once: bool = False
+    cooldown_minutes: int = Field(default=0, ge=0, le=525600)
+    priority: int = Field(default=0, ge=-1000, le=1000)
+    enabled: bool = True
+
+
+class EventDefPatch(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=64)
+    category: str | None = Field(default=None, max_length=32)
+    trigger: dict | None = None
+    cost: dict | None = None
+    effects: dict | None = None
+    prompt_template: str | None = Field(default=None, max_length=8000)
+    once: bool | None = None
+    cooldown_minutes: int | None = Field(default=None, ge=0, le=525600)
+    priority: int | None = Field(default=None, ge=-1000, le=1000)
+    enabled: bool | None = None
+
+
+class SceneDefIn(BaseModel):
+    """场景定义（新建）；key 创建后不可改。"""
+
+    key: str = Field(min_length=1, max_length=64, pattern=r"^[a-z][a-z0-9_]{0,63}$")
+    name: str = Field(min_length=1, max_length=64)
+    category: str = Field(default="story", max_length=32)
+    enter_trigger: dict = Field(default_factory=dict)
+    enter_cost: dict = Field(default_factory=dict)
+    scene_prompt: str = Field(default="", max_length=8000)
+    goal: str = Field(default="", max_length=2000)
+    min_turns: int = Field(default=3, ge=0, le=100)
+    max_turns: int = Field(default=12, ge=0, le=100)
+    exit: dict = Field(default_factory=dict)
+    effects: dict = Field(default_factory=dict)
+    next_scenes: list[str] = Field(default_factory=list, max_length=50)
+    once: bool = False
+    cooldown_minutes: int = Field(default=0, ge=0, le=525600)
+    priority: int = Field(default=0, ge=-1000, le=1000)
+    enabled: bool = True
+
+
+class SceneDefPatch(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=64)
+    category: str | None = Field(default=None, max_length=32)
+    enter_trigger: dict | None = None
+    enter_cost: dict | None = None
+    scene_prompt: str | None = Field(default=None, max_length=8000)
+    goal: str | None = Field(default=None, max_length=2000)
+    min_turns: int | None = Field(default=None, ge=0, le=100)
+    max_turns: int | None = Field(default=None, ge=0, le=100)
+    exit: dict | None = None
+    effects: dict | None = None
+    next_scenes: list[str] | None = Field(default=None, max_length=50)
+    once: bool | None = None
+    cooldown_minutes: int | None = Field(default=None, ge=0, le=525600)
+    priority: int | None = Field(default=None, ge=-1000, le=1000)
+    enabled: bool | None = None
+
+
 class CatalogModelIn(BaseModel):
     model_id: str = Field(min_length=1, max_length=128)
     display_name: str = Field(default="", max_length=64)

@@ -14,6 +14,21 @@
   --radius: 12px;
 }
 
+html[data-theme="light"] {
+  --bg: #f2f3f8;
+  --bg-soft: #ffffff;
+  --panel: #ffffff;
+  --panel-2: #eef0f6;
+  --border: #d9dde9;
+  --text: #222838;
+  --text-dim: #6a7288;
+  --accent: #4c5df0;
+  --accent-soft: rgba(76, 93, 240, 0.12);
+  --danger: #d9435c;
+  --ok: #1f9d6c;
+  --warn: #a9781c;
+}
+
 * {
   box-sizing: border-box;
 }
