@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from config import TIME_MAX_JUMP_HOURS
 from db import get_session
 from game import clock, events
-from helpers import error, get_save_or_error, load_attr_values
+from helpers import error, get_save_or_error, load_attr_values, save_settle_lock
 from orm import AttributeDef, Message, Save
 from schemas import AdvanceIn
 
@@ -21,7 +21,7 @@ router = APIRouter(tags=["advance"])
 MAX_TARGET_DAYS = 60
 
 
-def _resolve_target(now_abs: int, target: dict, settings: dict) -> int:
+def _resolve_target(now_abs: int, target: dict) -> int:
     """把 {month, day, hour, minute} 解析为绝对虚拟分钟（必要时进入下一年）。"""
     try:
         month = int(target.get("month", 1))
@@ -113,29 +113,30 @@ def _advance_and_settle(session: Session, save: Save, delta: int, source: str) -
 
 @router.post("/api/saves/{save_id}/advance")
 def advance(save_id: int, req: AdvanceIn, session: Session = Depends(get_session)):
-    save = get_save_or_error(session, save_id)
-    settings = save.settings or {}
-    now_abs = clock.absolute_minutes(save.game_minutes, settings)
-    modes = [x for x in (req.minutes, req.period, req.target) if x is not None]
-    if len(modes) != 1:
-        error("invalid_advance", "请只指定一种推进方式：minutes / period / target", 400)
+    with save_settle_lock(save_id):
+        save = get_save_or_error(session, save_id)
+        settings = save.settings or {}
+        now_abs = clock.absolute_minutes(save.game_minutes, settings)
+        modes = [x for x in (req.minutes, req.period, req.target) if x is not None]
+        if len(modes) != 1:
+            error("invalid_advance", "请只指定一种推进方式：minutes / period / target", 400)
 
-    if req.minutes is not None:
-        delta = min(int(req.minutes), TIME_MAX_JUMP_HOURS * 60)
-    elif req.period is not None:
-        target_abs = clock.next_period_start(now_abs, req.period.strip())
-        if target_abs is None:
-            error("invalid_period", f"未知时段：{req.period}", 400)
-        delta = target_abs - now_abs
-    else:
-        target_abs = _resolve_target(now_abs, req.target or {}, settings)
-        delta = target_abs - now_abs
-        if delta <= 0:
-            error("invalid_target", "目标时刻必须晚于当前虚拟时间", 400)
-        if delta > MAX_TARGET_DAYS * clock.DAY_MINUTES:
-            error("invalid_target", f"目标时刻过远（最多 {MAX_TARGET_DAYS} 天）", 400)
+        if req.minutes is not None:
+            delta = min(int(req.minutes), TIME_MAX_JUMP_HOURS * 60)
+        elif req.period is not None:
+            target_abs = clock.next_period_start(now_abs, req.period.strip())
+            if target_abs is None:
+                error("invalid_period", f"未知时段：{req.period}", 400)
+            delta = target_abs - now_abs
+        else:
+            target_abs = _resolve_target(now_abs, req.target or {})
+            delta = target_abs - now_abs
+            if delta <= 0:
+                error("invalid_target", "目标时刻必须晚于当前虚拟时间", 400)
+            if delta > MAX_TARGET_DAYS * clock.DAY_MINUTES:
+                error("invalid_target", f"目标时刻过远（最多 {MAX_TARGET_DAYS} 天）", 400)
 
-    return _advance_and_settle(session, save, delta, "advance")
+        return _advance_and_settle(session, save, delta, "advance")
 
 
 @router.get("/api/saves/{save_id}/clock")

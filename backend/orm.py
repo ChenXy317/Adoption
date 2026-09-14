@@ -99,7 +99,7 @@ class EventDef(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     key: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(64), nullable=False)
-    category: Mapped[str] = mapped_column(String(32), default="conditional", nullable=False)
+    category: Mapped[str] = mapped_column(String(32), default="fixed", nullable=False)
     trigger: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     cost: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     effects: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)

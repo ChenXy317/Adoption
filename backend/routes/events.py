@@ -10,8 +10,8 @@ from sqlalchemy.orm import Session
 from db import get_session
 from game import clock, events
 from game.attributes import apply_effects
-from helpers import error, get_save_or_error, load_attr_values
-from orm import AttributeDef, AttributeValue, EventDef, EventLog
+from helpers import error, get_save_or_error, load_attr_values, save_settle_lock
+from orm import AttributeDef, EventDef, EventLog
 
 router = APIRouter(tags=["events"])
 
@@ -52,105 +52,112 @@ def list_events(
 def trigger_manual(
     save_id: int, event_key: str, session: Session = Depends(get_session)
 ):
-    save = get_save_or_error(session, save_id)
-    event = session.scalar(select(EventDef).where(EventDef.key == event_key))
-    if event is None:
-        error("event_not_found", f"事件不存在：{event_key}", 404)
-    if event.category != "manual":
-        error("not_manual", "该事件不是手动事件，无法从行动菜单触发", 400)
+    with save_settle_lock(save_id):
+        save = get_save_or_error(session, save_id)
+        event = session.scalar(select(EventDef).where(EventDef.key == event_key))
+        if event is None:
+            error("event_not_found", f"事件不存在：{event_key}", 404)
+        if event.category != "manual":
+            error("not_manual", "该事件不是手动事件，无法从行动菜单触发", 400)
 
-    settings = save.settings or {}
-    defs = list(session.scalars(select(AttributeDef)))
-    defs_map = {d.key: d for d in defs}
-    values = load_attr_values(session, save_id)
-    triggered_ids, last_at = events.load_event_stats(session, save_id)
-    now_abs = clock.absolute_minutes(save.game_minutes, settings)
-    since = {key: max(0, now_abs - at) for key, at in last_at.items()}
-    ctx = events.build_context(session, save, values, minutes_since=since)
-    ok, reason = events.availability(
-        event,
-        ctx,
-        triggered=event.id in triggered_ids,
-        minutes_since=since.get(event.key),
-        allow_chance=False,
-    )
-    if not ok:
-        error(
-            "event_locked",
-            events.MANUAL_REASON_TEXT.get(reason, "当前不可用"),
-            409,
+        settings = save.settings or {}
+        defs = list(session.scalars(select(AttributeDef)))
+        defs_map = {d.key: d for d in defs}
+        values = load_attr_values(session, save_id)
+        triggered_ids, last_at = events.load_event_stats(session, save_id)
+        now_abs = clock.absolute_minutes(save.game_minutes, settings)
+        since = {key: max(0, now_abs - at) for key, at in last_at.items()}
+        ctx = events.build_context(session, save, values, minutes_since=since)
+        ok, reason = events.availability(
+            event,
+            ctx,
+            triggered=event.id in triggered_ids,
+            minutes_since=since.get(event.key),
+            allow_chance=False,
         )
-    ok, reason = events.check_cost(values, event.cost or {})
-    if not ok:
-        error("insufficient_money", "金钱不足，无法承担这项花费", 400)
+        if not ok:
+            error(
+                "event_locked",
+                events.MANUAL_REASON_TEXT.get(reason, "当前不可用"),
+                409,
+            )
+        ok, reason = events.check_cost(values, event.cost or {})
+        if not ok:
+            error("insufficient_money", "金钱不足，无法承担这项花费", 400)
 
-    cost = event.cost or {}
-    cost_money = max(0, int(cost.get("money") or 0))
-    cost_time = max(0, int(cost.get("time_minutes") or 0))
-    cost_changes: list[dict] = []
-    if cost_money:
-        updated, cost_changes = apply_effects(defs_map, values, {"money": -cost_money})
-        values.update(updated)
-        row = session.get(AttributeValue, (save_id, "money"))
-        if row is not None:
-            row.value = values["money"]
+        cost = event.cost or {}
+        try:
+            cost_money = max(0.0, float(cost.get("money") or 0))
+        except (TypeError, ValueError):
+            cost_money = 0.0
+        try:
+            cost_time = max(0, int(cost.get("time_minutes") or 0))
+        except (TypeError, ValueError):
+            cost_time = 0
+        cost_changes: list[dict] = []
+        if cost_money:
+            updated, cost_changes = apply_effects(
+                defs_map, values, {"money": -cost_money}
+            )
+            values.update(updated)
+            events.write_changes(session, save_id, values, cost_changes)
 
-    old_game = int(save.game_minutes)
-    result = events.apply_event(
-        session,
-        save,
-        event,
-        ctx,
-        values,
-        defs_map,
-        source="manual",
-        extra_advance=cost_time,
-    )
-    settled = events.settle_time(
-        session,
-        save,
-        defs,
-        values,
-        save.game_minutes + result["advance_minutes"],
-        source="manual",
-    )
-    session.commit()
+        old_game = int(save.game_minutes)
+        result = events.apply_event(
+            session,
+            save,
+            event,
+            ctx,
+            values,
+            defs_map,
+            source="manual",
+            extra_advance=cost_time,
+        )
+        settled = events.settle_time(
+            session,
+            save,
+            defs,
+            values,
+            save.game_minutes + result["advance_minutes"],
+            source="manual",
+        )
+        session.commit()
 
-    new_abs = clock.absolute_minutes(save.game_minutes, settings)
-    virtual = {
-        "absolute_minutes": new_abs,
-        **clock.split(new_abs),
-        "label": clock.time_label(new_abs),
-    }
-    changes = (
-        cost_changes
-        + result["attrs"]
-        + settled["tick_changes"]
-        + [c for item in settled["triggered"] for c in item["attrs"]]
-    )
-    return {
-        "event": {
-            "key": result["key"],
-            "name": result["name"],
-            "category": result["category"],
-            "content": result["content"],
-            "message_id": result["message_id"],
-        },
-        "game_minutes": save.game_minutes,
-        "advance_minutes": int(save.game_minutes) - old_game,
-        "virtual": virtual,
-        "changes": changes,
-        "ticks": settled["tick_changes"],
-        "events": [
-            {
-                "key": item["key"],
-                "name": item["name"],
-                "category": item["category"],
-                "content": item["content"],
-                "message_id": item["message_id"],
-                "advance_minutes": item["advance_minutes"],
-            }
-            for item in settled["triggered"]
-        ],
-        "messages": [result["message"], *settled["messages"]],
-    }
+        new_abs = clock.absolute_minutes(save.game_minutes, settings)
+        virtual = {
+            "absolute_minutes": new_abs,
+            **clock.split(new_abs),
+            "label": clock.time_label(new_abs),
+        }
+        changes = (
+            cost_changes
+            + result["attrs"]
+            + settled["tick_changes"]
+            + [c for item in settled["triggered"] for c in item["attrs"]]
+        )
+        return {
+            "event": {
+                "key": result["key"],
+                "name": result["name"],
+                "category": result["category"],
+                "content": result["content"],
+                "message_id": result["message_id"],
+            },
+            "game_minutes": save.game_minutes,
+            "advance_minutes": int(save.game_minutes) - old_game,
+            "virtual": virtual,
+            "changes": changes,
+            "ticks": settled["tick_changes"],
+            "events": [
+                {
+                    "key": item["key"],
+                    "name": item["name"],
+                    "category": item["category"],
+                    "content": item["content"],
+                    "message_id": item["message_id"],
+                    "advance_minutes": item["advance_minutes"],
+                }
+                for item in settled["triggered"]
+            ],
+            "messages": [result["message"], *settled["messages"]],
+        }

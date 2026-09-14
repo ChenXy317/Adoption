@@ -67,6 +67,17 @@ ATTR_MAX_DELTA_PER_MESSAGE = 20  # 单轮状态标签对单个属性的变化上
 EVENT_MAX_PER_SETTLEMENT = 3       # 单次结算最多注入的事件数
 EVENT_RECENT_WINDOW_MINUTES = 180  # 事件情境注入 prompt 的有效窗口（虚拟分钟）
 
+# ── 经济与冷落（M5 启用；数值已于 PLAN §10 定稿）──
+WORK_HOURS = 4                     # 打工耗时（虚拟小时）
+WORK_PAY = 120                     # 打工收益（金钱），时薪 30
+GIFT_TIERS = {                     # 礼物档位参考价（M5 礼物清单按此定价）
+    "small": {"price": 80, "affection": 2},
+    "large": {"price": 300, "affection": 5},
+}
+NEGLECT_DAYS = 3                   # 两次互动间推进 ≥N 游戏日且无对话视为冷落
+NEGLECT_AFFECTION_PER_DAY = 1      # 冷落每多 1 游戏日的好感降幅
+NEGLECT_AFFECTION_MAX = 5          # 单次冷落的好感降幅上限
+
 # ── 对话与记忆（M4 起逐步启用）──
 CHAT_HISTORY_MESSAGES = 30      # 组装 prompt 的最近消息条数
 MEMORY_TRIGGER_TURNS = 20       # 未总结消息达到该数量触发总结

@@ -147,7 +147,7 @@ FastAPI
 ### 5.5 对话引擎（SSE）
 
 - **Prompt 组装顺序**：系统规则 → 角色人设 → 属性+性格阶段 → 虚拟时间/节日 → 当前场景（如有）→ 激活事件情境 → 永久记忆注入 → 内容风格指令（可选，用户自写） → 最近 M 条原文 → 状态标签协议说明
-- **状态标签协议**：模型回复末尾输出 `<<<STATE {"attrs":{"affection":2},"mood_label":"开心","flags":{},"time":{"advance_minutes":30},"scene":{"action":"end","summary":"..."}} STATE>>>`（`scene` 仅在场景收尾时出现）；后端流式剥离（仿 `_ThinkStripper`，注意标签可能在末尾且跨 chunk，需 hold-back + 流结束 flush 解析）；应用钳制后的数值与推进量；`scene` 动作交场景结算（受 min_turns 约束）；解析失败静默忽略
+- **状态标签协议**：模型回复末尾输出 `<<<STATE {"attrs":{"affection":2},"mood_label":"开心","flags":{},"time":{"advance_minutes":30},"scene":{"action":"end","summary":"..."}} STATE>>>`（完整形态；当前已启用 `attrs` 与 `time`，非 dict 结构静默忽略；`flags`/`mood_label` 属 M5，`scene` 属 M3.5）；后端流式剥离（仿 `_ThinkStripper`，注意标签可能在末尾且跨 chunk，需 hold-back + 流结束 flush 解析）；应用钳制后的数值与推进量；`scene` 动作交场景结算（受 min_turns 约束）；解析失败静默忽略
 - **落库事务边界**：一次回复的全部写入（assistant 消息 + 属性钳制结果 + 时间推进 + tick + 事件/场景结算）在流结束后同一事务提交；客户端中途断流时保留已生成文本并照常结算（meta 标记 interrupted）
 - **sync ORM 使用规则**：流式阶段不做 DB 写；DB 访问集中在流前（组装上下文）与流后（结算落库）两端，中间不碰库，避免阻塞事件循环；确需中途写时用 run_in_threadpool 包装
 - **标签调试留痕**：解析失败或未输出状态标签时，把回复原文尾部存入消息 meta（不展示给用户），供调试 prompt 用
@@ -227,7 +227,7 @@ FastAPI
 | POST | `/api/saves/{id}/chat` | SSE 对话（含推进结算+事件评估） |
 | GET | `/api/saves/{id}/state` | 属性+虚拟时间+激活事件+当前场景+金钱 |
 | POST | `/api/saves/{id}/advance` | 显式推进时间（动作/调试） |
-| GET/POST | `/api/saves/{id}/events` | 事件日志 / 手动触发 |
+| GET/POST | `/api/saves/{id}/events` | 事件日志（GET）；手动触发见下一行 |
 | POST | `/api/saves/{id}/events/{key}/trigger` | manual 事件触发（校验 cost） |
 | GET/POST | `/api/saves/{id}/scenes` | 场景历史 / 手动进入（调试） |
 | POST | `/api/saves/{id}/scenes/end` | 手动结束当前场景（正常收尾） |
@@ -284,11 +284,12 @@ New Idea/（= D:\Projects\New Idea）
 - 多轮场景：scene_defs + save_flags.active_scene + scene_logs；每轮注入场景块（含轮数）；结束由 AI 标签 / min-max 轮 / exit 条件判定，min_turns 内拒绝提前收尾；结束同事务结算并生成场景记忆；同时仅一个活跃场景；事件 ⇄ 场景可互相衔接
 - 事件三类：随机（每游戏日开始时一次判定，结果记 save_flags）、固定（属性/flag 阈值触发）、手动（行动菜单主动选择，带 cost）；剧情链用 flag 串联；时段/日期/节日作为条件而非独立类型
 - 模型配置照 Nehchat：providers/catalog_models 两层目录 + `slug:model_id` 引用 + 密钥双模式（存库/环境变量）+ 对外永不回明文 + 删除引用保护 + hello 连通测试；单用户去掉多租户；总结模型同目录可选
-- 工程约定：流结束单事务落库、流式阶段不写 DB、总结任务 save 级互斥、属性 key 不可改（仅启停）、状态标签解析失败留痕 meta
+- 工程约定：流结束单事务落库、流式阶段不写 DB、总结任务 save 级互斥、属性 key 不可改（仅启停）、状态标签解析失败留痕 meta；同一存档的结算事务进程内串行（流后结算 / 推进 / 手动事件共用）
 - 兼容：SQLAlchemy pin ≥2.0.41（支持 Py3.14）；「她的日记」本期不做（对核心循环无贡献，留作将来）
 - 测试：`game/` 纯函数层（clock/events/tags）配最小单元测试，覆盖时间换算、条件评估、钳制边界
 - 项目根目录 `D:\Projects\New Idea`；Python 3.14（3.12+ 兼容，与 Nehchat 环境一致）
+- **平衡数值定稿（原待定 1，2026-09-14）**：推进默认 10 分钟/条、上限 180 分钟/条、单跳 24 小时、目标跳最多 60 天（现有 config 值不变）；打工 4 小时 → +120（时薪 30）；礼物两档：小礼物 ¥80 / 好感 +2，大礼物 ¥300 / 好感 +5；手动事件价格沿用种子（火锅 80 / 书店 60 / 连衣裙 300）；冷落阈值 3 游戏日无对话 → 好感 -1/日，单次上限 -5。参数落 `backend/config.py`（`WORK_*` / `GIFT_TIERS` / `NEGLECT_*`），M5 直接引用
 
 **待定**：
 
-1. 数值与内容种子：打工时长/收益、事件/礼物清单与价格、冷落参数、推进上限——**M3 结束前必须定稿**，否则 M5 无从调平衡（先按默认 10 分钟 / 上限 180 分钟 / 单跳 24 小时试跑）
+- 暂无（内容种子清单可在 M5 按上述价目扩充）

@@ -1,6 +1,6 @@
 # STATUS — 当前状态记录
 
-> 更新时间：2026-09-14（M3 事件与时间完成、全链路验证通过、未提交）
+> 更新时间：2026-09-14（M3 已提交 `679a356`；全量审查完成，P1/P2/P3 修复未提交）
 > 用途：跨会话交接。新会话先读 `PLAN.md`（唯一真相源）+ 本文件，再动手。
 
 ## 一、项目速览
@@ -16,8 +16,9 @@
 |---|---|
 | M1 骨架（建表+种子、存档 CRUD、模型目录、SSE 对话、Vue 基础界面） | 已完成，已提交 `44c7425` |
 | M2 女主角刻画（内置设定书、prompt 深度注入、属性管理接口） | 已完成，已提交 `890a3bd` |
-| M3 事件与时间（虚拟时钟结算、三类事件、推进面板、事件种子） | **已完成，未提交**（见第五节） |
-| M3.5 多轮场景 | 未开工（下一步，见第七节） |
+| M3 事件与时间（虚拟时钟结算、三类事件、推进面板、事件种子） | 已完成，已提交 `679a356` |
+| 审查修复（P1 属性补行/标签类型防御；P2/P3 见第十一节） | **已完成，未提交** |
+| M3.5 多轮场景 | 未开工（下一步，见第八节） |
 
 ## 三、运行方式
 
@@ -41,7 +42,7 @@
 - 属性 tick 已生效：mood `regress`（回归 50，0.5/时）、vigilance `decay`（1/时）
 - 供应商同前：`aihubmix` / `openrouter`（均 `use_env_key`，库内无明文密钥）
 
-## 五、未提交变更（M3，相对 `890a3bd`）
+## 五、M3 变更清单（已提交 `679a356`，历史记录）
 
 **后端**
 - `game/events.py`（新）：条件求值器（`all/any/not` + `attr/flag/game_day/period/date/since_event` + 根级 `chance`）；可用性（启用/once/冷却/条件）；`settle_time` 统一结算（tick → 跨日随机判定 → fixed/random 触发 → 效果应用，最多 4 轮、单次最多 3 个事件）
@@ -71,12 +72,14 @@
 
 ## 七、关键决策速查（M3 实现口径）
 
-- **随机事件**：每游戏日**零点**判定一次（判定时忽略时段/日期条件），结果记 `save_flags.random_rolls = {key:{day,hit}}`；命中后当天满足全部条件（含时段）即注入，同日不重复
+- **随机事件**：每游戏日**零点**判定一次（判定时忽略时段/日期条件），结果记 `save_flags.random_rolls = {key:{day,hit}}`；命中后当天满足全部条件（含时段）即注入，同日不重复；当天尚无判定记录时（含开局首日）在下一次结算补判一次
 - **固定事件**：每次结算评估；种子均 `once=true`。注意：自定义 fixed 若不带 once/cooldown，会每次结算重复触发
-- **手动事件**：条件/once/冷却 + 金钱余额校验；`cost.money` 直接扣，`cost.time_minutes` 作为额外推进走统一结算
+- **手动事件**：条件/once/冷却 + 金钱余额校验；`cost.money` 直接扣（支持小数），`cost.time_minutes` 作为额外推进走统一结算
 - **效果 JSON**：`attrs`（无视 ai_editable，可改钱）/ `advance_minutes`（单次上限 24h）/ `flags` / `unlock_events`（写 `event_unlocked:<key>` flag）
 - **事件落库**：`event_logs` + `role=event` 消息 + prompt 情境块；SSE `event_triggered` 携带消息体
 - **大跳兜底**：跳过多日时中间日期只做随机判定、不注入（仅当日命中注入）；单次结算最多 4 轮/3 事件防循环
+- **结算串行**：同一存档的「流后结算 / advance / 手动事件」共用进程内锁（helpers.save_settle_lock），防并发覆盖属性
+- **推进参数**：AI 推进的默认/上限读存档 `settings.advance`（缺省回退 config 10/180）；显式推进仍由 `TIME_MAX_JUMP_HOURS` 钳制
 
 ## 八、下一步 M3.5（多轮场景）建议顺序（PLAN 5.3 / 里程碑）
 
@@ -100,8 +103,26 @@
 
 ## 十、给下一个会话的建议
 
-- 动手前：读 `PLAN.md` + 本文件 → `git status`（M3 未提交）→ 可先提交 M3 再开工 M3.5
+- 动手前：读 `PLAN.md` + 本文件 → `git status`（审查修复未提交）→ 可先提交修复再开工 M3.5
 - 后端改动需重启服务（未开 reload）；前端改动需 `npm run build`
 - 验证习惯：先 `unittest` → 再 httpx 端到端（含 SSE）→ 最后浏览器实测
 - 聊天验证注意选可用模型（aihubmix 的 `xiaomi-mimo-v2.5-free`），OpenRouter 免费额度可能已用尽
-- 事件平衡数据（打工收益、礼物价格、冷落参数）仍待定，PLAN 第 10 节要求 **M3 结束前定稿**——M3.5 开工前建议先补
+- 平衡数值已定稿（PLAN §10）；冷落规则/打工/礼物为 M5 实现时的数据依据
+
+## 十一、审查修复记录（2026-09-14，未提交）
+
+全量审查（含无模型真库冒烟）后修复：
+
+- **P1-1 属性值补行**：`events.write_changes` 在 `attribute_values` 缺行时自动补建（此前建档后新增/重新启用的属性，变化只上报不落库）
+- **P1-2 标签类型防御**：STATE 标签 `attrs`/`time` 非 dict 时不再抛异常（`game/attributes.py` 也加了 deltas 类型守卫）；结构异常静默忽略
+- **P2-1 存档级推进生效**：`clock.advance_limits(settings)` 读取 `settings.advance`（默认 10 / 上限 180），替换原全局常量硬编码
+- **P2-2 首日随机判定**：当天无 `random_rolls` 记录时（含开局首日）在结算中补判一次
+- **P2-3 属性种子覆盖式**：`seeds/loader.apply_seeds` 改为与角色/事件一致（种子为准覆盖字段），`enabled` 不受影响；README 已注明
+- **P2-4 前端刷新**：聊天成功结算后也 `loadState`，互动菜单可用性不再过期（`stores/chat.js`）
+- **P2-5 重置脚本**：`重置启动.bat` 从 `.env` 读 host/port/user/database/password（系统环境变量优先）
+- **P2-6 平衡数值定稿**：见 PLAN §10；参数落 `config.py`（`WORK_*` / `GIFT_TIERS` / `NEGLECT_*`）
+- **P3-1 SPA 路径校验**：`main.py` 改用 `is_relative_to`（防同前缀目录绕过）
+- **P3-2 money 小数**：手动事件扣款不再 `int()` 截断
+- **P3-3 结算锁**：同一存档的流后结算/advance/手动事件串行（`helpers.save_settle_lock`），防并发覆盖
+- **P3-4 存档缺失**：流后结算发现存档被删时回 SSE `error`（`save_not_found`），不再 500
+- **P3-5 文档/默认值**：`EventDef.category` 默认改 `fixed`；PLAN 5.5 标签说明与 API 表修正

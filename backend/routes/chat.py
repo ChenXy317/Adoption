@@ -17,19 +17,14 @@ from sqlalchemy import select
 from starlette.concurrency import run_in_threadpool
 
 from ai_client import AIClientError, ai
-from config import (
-    CHAT_HISTORY_MESSAGES,
-    EVENT_RECENT_WINDOW_MINUTES,
-    TIME_DEFAULT_ADVANCE,
-    TIME_MAX_ADVANCE_PER_MESSAGE,
-)
+from config import CHAT_HISTORY_MESSAGES, EVENT_RECENT_WINDOW_MINUTES
 from db import SessionLocal
 from game import clock, events
 from game.attributes import apply_deltas, phase_of
 from game.prompt import build_messages
 from game.tags import StateTagStripper, parse_state
-from helpers import get_runtime, get_save_or_error, load_attr_values
-from orm import AttributeDef, AttributeValue, Character, Message, Save
+from helpers import get_runtime, get_save_or_error, load_attr_values, save_settle_lock
+from orm import AttributeDef, Character, Message, Save
 from schemas import ChatIn
 
 router = APIRouter(tags=["chat"])
@@ -40,6 +35,10 @@ SSE_HEADERS = {
     "Connection": "keep-alive",
     "X-Accel-Buffering": "no",
 }
+
+
+class SaveGoneError(Exception):
+    """结算时存档已被删除。"""
 
 
 def sse(event: str, data: dict) -> str:
@@ -112,103 +111,107 @@ def _settle(save_id: int, text: str, tag_raw: str, interrupted: bool) -> dict:
     """流后：解析状态标签 → 应用属性/时间 → 事件结算 → 同一事务落库。"""
     session = SessionLocal()
     try:
-        save = session.get(Save, save_id)
-        settings = save.settings or {}
-        defs = list(session.scalars(select(AttributeDef)))
-        defs_map = {d.key: d for d in defs}
-        values = load_attr_values(session, save_id)
-        old_game = int(save.game_minutes)
-        state = parse_state(tag_raw)
-        changes: list[dict] = []
-        time_advance = 0
-        if state is not None:
-            updated, changes = apply_deltas(defs_map, values, state.get("attrs") or {})
-            values.update(updated)
-            for change in changes:
-                row = session.get(AttributeValue, (save_id, change["key"]))
-                if row is not None:
-                    row.value = change["new"]
-            raw_advance = (state.get("time") or {}).get("advance_minutes")
+        with save_settle_lock(save_id):
+            save = session.get(Save, save_id)
+            if save is None:
+                raise SaveGoneError(f"存档 {save_id} 已被删除")
+            settings = save.settings or {}
+            default_advance, max_advance = clock.advance_limits(settings)
+            defs = list(session.scalars(select(AttributeDef)))
+            defs_map = {d.key: d for d in defs}
+            values = load_attr_values(session, save_id)
+            old_game = int(save.game_minutes)
+            state = parse_state(tag_raw)
+            changes: list[dict] = []
+            raw_advance = None
+            if state is not None:
+                raw_attrs = state.get("attrs")
+                updated, changes = apply_deltas(
+                    defs_map, values, raw_attrs if isinstance(raw_attrs, dict) else {}
+                )
+                values.update(updated)
+                events.write_changes(session, save_id, values, changes)
+                raw_time = state.get("time")
+                if isinstance(raw_time, dict):
+                    raw_advance = raw_time.get("advance_minutes")
             if raw_advance is None:
-                time_advance = TIME_DEFAULT_ADVANCE
+                time_advance = default_advance
             else:
                 try:
                     time_advance = int(raw_advance)
                 except (TypeError, ValueError):
-                    time_advance = TIME_DEFAULT_ADVANCE
-        else:
-            time_advance = TIME_DEFAULT_ADVANCE
-        time_advance = max(0, min(int(time_advance), TIME_MAX_ADVANCE_PER_MESSAGE))
+                    time_advance = default_advance
+            time_advance = max(0, min(int(time_advance), max_advance))
 
-        abs_before = clock.absolute_minutes(old_game, settings)
-        meta: dict = {"attrs": changes, "time_advance": time_advance}
-        if interrupted:
-            meta["interrupted"] = True
-        if state is None:
-            meta["state_parse_failed"] = True
-            meta["tag_debug"] = (tag_raw or text[-500:])[:1000]
-        assistant = None
-        if text.strip():
-            assistant = Message(
-                save_id=save_id,
-                role="assistant",
-                content=text,
-                meta=meta,
-                game_minutes_at=abs_before,
+            abs_before = clock.absolute_minutes(old_game, settings)
+            meta: dict = {"attrs": changes, "time_advance": time_advance}
+            if interrupted:
+                meta["interrupted"] = True
+            if state is None:
+                meta["state_parse_failed"] = True
+                meta["tag_debug"] = (tag_raw or text[-500:])[:1000]
+            assistant = None
+            if text.strip():
+                assistant = Message(
+                    save_id=save_id,
+                    role="assistant",
+                    content=text,
+                    meta=meta,
+                    game_minutes_at=abs_before,
+                )
+                session.add(assistant)
+                session.flush()
+
+            settled = events.settle_time(
+                session,
+                save,
+                defs,
+                values,
+                old_game + time_advance,
+                source="chat",
             )
-            session.add(assistant)
-            session.flush()
+            total_advance = int(save.game_minutes) - old_game
+            meta["ticks"] = settled["tick_changes"]
+            if settled["triggered"]:
+                meta["events"] = [item["key"] for item in settled["triggered"]]
+            if assistant is not None:
+                assistant.game_minutes_at = settled["absolute_minutes"]
+            session.commit()
 
-        settled = events.settle_time(
-            session,
-            save,
-            defs,
-            values,
-            old_game + time_advance,
-            source="chat",
-        )
-        total_advance = int(save.game_minutes) - old_game
-        meta["ticks"] = settled["tick_changes"]
-        if settled["triggered"]:
-            meta["events"] = [item["key"] for item in settled["triggered"]]
-        if assistant is not None:
-            assistant.game_minutes_at = settled["absolute_minutes"]
-        session.commit()
-
-        abs_minutes = clock.absolute_minutes(save.game_minutes, settings)
-        virtual = {
-            "absolute_minutes": abs_minutes,
-            **clock.split(abs_minutes),
-            "label": clock.time_label(abs_minutes),
-        }
-        combined = (
-            changes
-            + settled["tick_changes"]
-            + [c for item in settled["triggered"] for c in item["attrs"]]
-        )
-        return {
-            "message_id": assistant.id if assistant else None,
-            "changes": combined,
-            "ai_changes": changes,
-            "phase": phase_of(values),
-            "time_advance": total_advance,
-            "game_minutes": save.game_minutes,
-            "virtual": virtual,
-            "parsed": state is not None,
-            "interrupted": interrupted,
-            "events": [
-                {
-                    "key": item["key"],
-                    "name": item["name"],
-                    "category": item["category"],
-                    "content": item["content"],
-                    "message_id": item["message_id"],
-                    "advance_minutes": item["advance_minutes"],
-                }
-                for item in settled["triggered"]
-            ],
-            "messages": settled["messages"],
-        }
+            abs_minutes = clock.absolute_minutes(save.game_minutes, settings)
+            virtual = {
+                "absolute_minutes": abs_minutes,
+                **clock.split(abs_minutes),
+                "label": clock.time_label(abs_minutes),
+            }
+            combined = (
+                changes
+                + settled["tick_changes"]
+                + [c for item in settled["triggered"] for c in item["attrs"]]
+            )
+            return {
+                "message_id": assistant.id if assistant else None,
+                "changes": combined,
+                "ai_changes": changes,
+                "phase": phase_of(values),
+                "time_advance": total_advance,
+                "game_minutes": save.game_minutes,
+                "virtual": virtual,
+                "parsed": state is not None,
+                "interrupted": interrupted,
+                "events": [
+                    {
+                        "key": item["key"],
+                        "name": item["name"],
+                        "category": item["category"],
+                        "content": item["content"],
+                        "message_id": item["message_id"],
+                        "advance_minutes": item["advance_minutes"],
+                    }
+                    for item in settled["triggered"]
+                ],
+                "messages": settled["messages"],
+            }
     finally:
         session.close()
 
@@ -268,9 +271,17 @@ async def chat(save_id: int, req: ChatIn):
                 or {"code": "empty_reply", "message": "模型没有返回任何内容"},
             )
             return
-        settled = await run_in_threadpool(
-            _settle, save_id, text, stripper.state_raw, error_payload is not None
-        )
+        settled = None
+        try:
+            settled = await run_in_threadpool(
+                _settle, save_id, text, stripper.state_raw, error_payload is not None
+            )
+        except SaveGoneError:
+            yield sse(
+                "error",
+                {"code": "save_not_found", "message": "存档不存在或已被删除"},
+            )
+            return
         if settled["changes"]:
             yield sse(
                 "state_update",

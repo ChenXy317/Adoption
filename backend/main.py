@@ -120,12 +120,9 @@ if dist_dir.is_dir() and any(dist_dir.iterdir()):
                 status_code=404,
                 detail={"code": "not_found", "message": "接口不存在", "detail": ""},
             )
+        dist_root = dist_dir.resolve()
         candidate = (dist_dir / full_path).resolve()
-        if (
-            full_path
-            and candidate.is_file()
-            and str(candidate).startswith(str(dist_dir.resolve()))
-        ):
+        if full_path and candidate.is_file() and candidate.is_relative_to(dist_root):
             return FileResponse(candidate)
         return FileResponse(dist_dir / "index.html")
 else:

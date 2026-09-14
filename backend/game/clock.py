@@ -6,7 +6,7 @@
 """
 from __future__ import annotations
 
-from config import CALENDAR_DEFAULT
+from config import CALENDAR_DEFAULT, TIME_DEFAULT_ADVANCE, TIME_MAX_ADVANCE_PER_MESSAGE
 
 DAY_MINUTES = 1440
 MONTH_DAYS = 30
@@ -72,6 +72,27 @@ def day_starts_between(from_abs: int, to_abs: int, *, max_days: int = 90) -> lis
 
 def period_keys() -> list[str]:
     return [key for _, key, _ in _PERIOD_TABLE]
+
+
+def advance_limits(settings: dict | None) -> tuple[int, int]:
+    """返回 (默认推进分钟, 单条消息最大推进分钟)；存档 settings.advance 可覆盖。"""
+    default = int(TIME_DEFAULT_ADVANCE)
+    maximum = int(TIME_MAX_ADVANCE_PER_MESSAGE)
+    cfg = (settings or {}).get("advance")
+    if isinstance(cfg, dict):
+        raw_default = cfg.get("default_minutes")
+        raw_max = cfg.get("max_per_message")
+        try:
+            if raw_default is not None:
+                default = max(0, int(raw_default))
+        except (TypeError, ValueError):
+            pass
+        try:
+            if raw_max is not None:
+                maximum = max(1, int(raw_max))
+        except (TypeError, ValueError):
+            pass
+    return default, maximum
 
 
 def next_period_start(abs_minutes: int, period_key: str) -> int | None:

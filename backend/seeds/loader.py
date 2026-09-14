@@ -19,36 +19,80 @@ logger = logging.getLogger(__name__)
 
 
 def apply_seeds(session: Session) -> None:
+    """装载内置属性定义（seeds/attributes.json 为准，覆盖同名定义的字段）。
+
+    种子未提供的字段保持库内原值（enabled 不受种子影响）；default_value 会钳制到 min/max。
+    """
     path = SEEDS_DIR / "attributes.json"
     if not path.exists():
         logger.warning("未找到种子文件: %s", path)
         return
     with open(path, encoding="utf-8") as f:
         items = json.load(f)
-    existing = {d.key for d in session.scalars(select(AttributeDef))}
-    added = 0
+    existing = {d.key: d for d in session.scalars(select(AttributeDef))}
+    added = updated = 0
     for item in items:
-        key = item.get("key")
-        if not key or key in existing:
+        key = (item.get("key") or "").strip()
+        if not key:
             continue
-        session.add(
-            AttributeDef(
-                key=key,
-                name=item.get("name") or key,
-                category=item.get("category", "stat"),
-                min=item.get("min", 0),
-                max=item.get("max", 100),
-                default_value=item.get("default_value", 0),
-                tick_rule=item.get("tick_rule"),
-                ai_editable=bool(item.get("ai_editable", True)),
-                sort=int(item.get("sort", 0)),
-                enabled=True,
+        definition = existing.get(key)
+        raw_default = item.get("default_value", 0)
+        lo = float(item.get("min", 0))
+        hi = float(item.get("max", 100))
+        if definition is None:
+            session.add(
+                AttributeDef(
+                    key=key,
+                    name=item.get("name") or key,
+                    category=item.get("category", "stat"),
+                    min=lo,
+                    max=hi,
+                    default_value=min(max(float(raw_default), lo), hi),
+                    tick_rule=item.get("tick_rule"),
+                    ai_editable=bool(item.get("ai_editable", True)),
+                    sort=int(item.get("sort", 0)),
+                    enabled=True,
+                )
             )
-        )
-        added += 1
-    if added:
+            added += 1
+            continue
+        fields: dict = {}
+        for name in (
+            "name",
+            "category",
+            "min",
+            "max",
+            "default_value",
+            "tick_rule",
+            "ai_editable",
+            "sort",
+        ):
+            if name in item:
+                fields[name] = item[name]
+        if not fields:
+            continue
+        lo = float(fields.get("min", definition.min))
+        hi = float(fields.get("max", definition.max))
+        if lo >= hi:
+            logger.warning("属性种子 %s 的 min/max 非法，已跳过更新", key)
+            continue
+        if "name" in fields:
+            fields["name"] = str(fields["name"] or key)
+        if "category" in fields:
+            fields["category"] = str(fields["category"] or "stat")
+        if "ai_editable" in fields:
+            fields["ai_editable"] = bool(fields["ai_editable"])
+        if "sort" in fields:
+            fields["sort"] = int(fields["sort"] or 0)
+        if "default_value" in fields:
+            fields["default_value"] = min(max(float(fields["default_value"]), lo), hi)
+        if any(getattr(definition, name) != value for name, value in fields.items()):
+            for name, value in fields.items():
+                setattr(definition, name, value)
+            updated += 1
+    if added or updated:
         session.commit()
-        logger.info("已写入 %d 条默认属性定义", added)
+        logger.info("属性种子装载完成：新增 %d 条，更新 %d 条", added, updated)
 
 
 def apply_event_seeds(session: Session) -> None:

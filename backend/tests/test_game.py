@@ -77,6 +77,29 @@ class ClockTest(unittest.TestCase):
         d2 = clock.split(clock.absolute_minutes(31, settings))
         self.assertEqual((d2["month"], d2["day"], d2["hour"]), (1, 1, 0))
 
+    def test_advance_limits(self):
+        self.assertEqual(clock.advance_limits({}), (10, 180))
+        self.assertEqual(clock.advance_limits(None), (10, 180))
+        self.assertEqual(
+            clock.advance_limits(
+                {"advance": {"default_minutes": 5, "max_per_message": 60}}
+            ),
+            (5, 60),
+        )
+        self.assertEqual(
+            clock.advance_limits(
+                {"advance": {"default_minutes": -5, "max_per_message": 0}}
+            ),
+            (0, 1),
+        )
+        self.assertEqual(
+            clock.advance_limits(
+                {"advance": {"default_minutes": "bad", "max_per_message": None}}
+            ),
+            (10, 180),
+        )
+        self.assertEqual(clock.advance_limits({"advance": "bad"}), (10, 180))
+
 
 class AttributesTest(unittest.TestCase):
     def test_clamp(self):
@@ -95,6 +118,15 @@ class AttributesTest(unittest.TestCase):
         self.assertEqual(new_values["affection"], 70.0)
         self.assertEqual(new_values["money"], 2000.0)
         self.assertEqual([c["key"] for c in changes], ["affection"])
+
+    def test_apply_deltas_rejects_non_dict(self):
+        defs = {"affection": make_def("affection")}
+        new_values, changes = apply_deltas(defs, {"affection": 50.0}, ["affection"])
+        self.assertEqual(new_values["affection"], 50.0)
+        self.assertEqual(changes, [])
+        new_values, changes = apply_effects(defs, {"affection": 50.0}, "bad")
+        self.assertEqual(new_values["affection"], 50.0)
+        self.assertEqual(changes, [])
 
     def test_apply_deltas_min_max(self):
         defs = {"mood": make_def("mood", hi=60)}

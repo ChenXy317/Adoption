@@ -3,7 +3,7 @@ chcp 65001 >nul
 cd /d %~dp0
 title 养成 - 重置启动
 
-echo 警告：此操作将删除数据库 new_idea 的全部数据（所有存档不可恢复）。
+echo 警告：此操作将删除数据库的全部数据（所有存档不可恢复）。
 set /p CONFIRM=请输入 YES 确认重置：
 if /i not "%CONFIRM%"=="YES" (
     echo 已取消。
@@ -11,18 +11,30 @@ if /i not "%CONFIRM%"=="YES" (
     exit /b 0
 )
 
-if "%MYSQL_PASSWORD%"=="" (
-    set /p MYSQL_PASSWORD=请输入 MySQL 密码：
+set "MYSQL_HOST=localhost"
+set "MYSQL_PORT=3306"
+set "MYSQL_USER=root"
+set "MYSQL_DATABASE=new_idea"
+if exist ".env" (
+    for /f "usebackq tokens=1,* delims==" %%A in (".env") do (
+        if /i "%%~A"=="MYSQL_HOST" set "MYSQL_HOST=%%~B"
+        if /i "%%~A"=="MYSQL_PORT" set "MYSQL_PORT=%%~B"
+        if /i "%%~A"=="MYSQL_USER" set "MYSQL_USER=%%~B"
+        if /i "%%~A"=="MYSQL_DATABASE" set "MYSQL_DATABASE=%%~B"
+        if /i "%%~A"=="MYSQL_PASSWORD" if not defined MYSQL_PASSWORD set "MYSQL_PASSWORD=%%~B"
+    )
 )
-set MYSQL_PWD=%MYSQL_PASSWORD%
-mysql -u root -e "DROP DATABASE IF EXISTS new_idea;"
-set MYSQL_PWD=
+
+if "%MYSQL_PASSWORD%"=="" set /p MYSQL_PASSWORD=请输入 MySQL 密码：
+set "MYSQL_PWD=%MYSQL_PASSWORD%"
+mysql --host=%MYSQL_HOST% --port=%MYSQL_PORT% --user=%MYSQL_USER% -e "DROP DATABASE IF EXISTS `%MYSQL_DATABASE%`;"
+set "MYSQL_PWD="
 if errorlevel 1 (
-    echo [错误] 删除数据库失败，请确认 MySQL 已启动且密码正确。
+    echo [错误] 删除数据库失败，请确认 MySQL 已启动且账号密码正确。
     pause
     exit /b 1
 )
-echo 数据库已重置。
+echo 数据库 %MYSQL_DATABASE% 已重置。
 
 if not exist "backend\.venv\Scripts\python.exe" (
     echo [提示] 尚未初始化后端环境，请先运行 快速启动.bat。

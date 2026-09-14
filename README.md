@@ -76,6 +76,7 @@ cd backend
 - 完全设计好的内置角色，不在游戏界面暴露编辑；真相源为 `backend/seeds/character.json`，启动时自动装载（以种子为准覆盖库中记录）。
 - 修改设定：编辑该 JSON 后重启服务。
 - 深度字段：外貌/穿着/性格/说话风格/喜好/背景/关系史/日常/秘密/四阶段语气/参考台词。
+- 属性定义与事件同为内置种子（`backend/seeds/attributes.json`、`backend/seeds/events.json`），启动时以种子为准覆盖入库；改完重启生效（`enabled` 启停状态不受种子影响）。
 
 ## 当前进度
 

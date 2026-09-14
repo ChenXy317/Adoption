@@ -109,7 +109,7 @@ export const useChatStore = defineStore("chat", {
         this.streaming = false;
         hadText = Boolean(assistant.content.trim());
         if (failed && !hadText) this._dropMessage(assistant);
-        if (eventTriggered) {
+        if (settled || eventTriggered) {
           game.loadState(saveId).catch(() => {});
         }
       }

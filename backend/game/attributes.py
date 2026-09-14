@@ -52,7 +52,9 @@ def _apply_values(
     """按定义应用属性变化；respect_ai 时跳过 AI 不可改的属性。"""
     new_values = dict(values)
     changes: list[dict] = []
-    for key, raw_delta in (deltas or {}).items():
+    if not isinstance(deltas, dict):
+        return new_values, changes
+    for key, raw_delta in deltas.items():
         definition = defs_map.get(key)
         if definition is None or not definition.enabled:
             continue

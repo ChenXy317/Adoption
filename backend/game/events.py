@@ -310,11 +310,19 @@ def _message_dict(message: Message) -> dict:
     }
 
 
-def _write_changes(session: Session, save_id: int, values: dict, changes: list[dict]) -> None:
+def write_changes(session: Session, save_id: int, values: dict, changes: list[dict]) -> None:
+    """把属性变化写入 attribute_values；缺行时自动补建（属性定义晚于存档创建）。"""
     for change in changes:
-        row = session.get(AttributeValue, (save_id, change["key"]))
-        if row is not None:
-            row.value = values[change["key"]]
+        key = change["key"]
+        if key not in values:
+            continue
+        row = session.get(AttributeValue, (save_id, key))
+        if row is None:
+            session.add(
+                AttributeValue(save_id=save_id, attr_key=key, value=values[key])
+            )
+        else:
+            row.value = values[key]
 
 
 def apply_event(
@@ -334,7 +342,7 @@ def apply_event(
     if effects.get("attrs"):
         updated, attr_changes = apply_effects(defs_map, values, effects.get("attrs"))
         values.update(updated)
-        _write_changes(session, save.id, values, attr_changes)
+        write_changes(session, save.id, values, attr_changes)
     flags = effects.get("flags") or {}
     for key, value in flags.items():
         set_flag(session, save.id, str(key), value)
@@ -413,7 +421,7 @@ def _advance_core(
     new_abs = clock.absolute_minutes(target, settings)
     new_values, tick_changes = apply_ticks(defs_map, values, delta / 60.0)
     values.update(new_values)
-    _write_changes(session, save.id, values, tick_changes)
+    write_changes(session, save.id, values, tick_changes)
     save.game_minutes = target
     return delta, tick_changes, clock.day_starts_between(old_abs, new_abs)
 
@@ -442,10 +450,11 @@ def _roll_new_days(
         for event in event_defs:
             if event.category != "random":
                 continue
-            if event.once and event.id in triggered_ids:
-                continue
             entry = state.get(event.key)
             if isinstance(entry, dict) and entry.get("day") == day:
+                continue
+            if event.once and event.id in triggered_ids:
+                state[event.key] = {"day": day, "hit": False, "reason": "used"}
                 continue
             ok, reason = availability(
                 event,
@@ -567,6 +576,19 @@ def settle_time(
     )
     tick_changes.extend(ticks)
     pending_days.extend(crossed)
+
+    if any(event.category == "random" for event in event_defs):
+        today = clock.day_index(
+            clock.absolute_minutes(save.game_minutes, save.settings or {})
+        )
+        state = _random_roll_state(session, save.id)
+        rolled_today = any(
+            isinstance(entry, dict) and entry.get("day") == today
+            for entry in state.values()
+        )
+        today_start = today * clock.DAY_MINUTES
+        if not rolled_today and today_start not in pending_days:
+            pending_days.insert(0, today_start)
 
     exclude: set[str] = set()
     rounds = 0

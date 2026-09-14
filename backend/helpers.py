@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os
 import re
+import threading
 
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -15,6 +16,19 @@ from orm import AttributeDef, AttributeValue, CatalogModel, Character, Provider,
 
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 ENV_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,63}$")
+
+_save_locks: dict[int, threading.Lock] = {}
+_save_locks_guard = threading.Lock()
+
+
+def save_settle_lock(save_id: int) -> threading.Lock:
+    """同一存档的结算事务串行化，避免流后结算与推进/手动事件并发覆盖。"""
+    with _save_locks_guard:
+        lock = _save_locks.get(save_id)
+        if lock is None:
+            lock = threading.Lock()
+            _save_locks[save_id] = lock
+        return lock
 
 
 def error(code: str, message: str, status: int = 400, detail: str = "") -> None:
