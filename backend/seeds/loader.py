@@ -98,7 +98,8 @@ def apply_seeds(session: Session) -> None:
 def apply_event_seeds(session: Session) -> None:
     """装载内置事件定义（seeds/events.json 为准，覆盖同名事件的字段）。
 
-    已存在的自定义事件不被删除；种子中移除的事件保持库内原样，便于临时调试。
+    已存在的自定义事件不被删除；种子中移除的事件保持库内原样，便于临时调试；
+    启停状态（enabled）不受种子影响，已有记录保留库内值。
     """
     path = SEEDS_DIR / "events.json"
     if not path.exists():
@@ -124,11 +125,16 @@ def apply_event_seeds(session: Session) -> None:
             "once": bool(item.get("once", False)),
             "cooldown_minutes": int(item.get("cooldown_minutes", 0) or 0),
             "priority": int(item.get("priority", 0) or 0),
-            "enabled": bool(item.get("enabled", True)),
         }
         definition = existing.get(key)
         if definition is None:
-            session.add(EventDef(key=key, **fields))
+            session.add(
+                EventDef(
+                    key=key,
+                    enabled=bool(item.get("enabled", True)),
+                    **fields,
+                )
+            )
             added += 1
             continue
         if any(getattr(definition, name) != value for name, value in fields.items()):
@@ -143,7 +149,8 @@ def apply_event_seeds(session: Session) -> None:
 def apply_scene_seeds(session: Session) -> None:
     """装载内置场景定义（seeds/scenes.json 为准，覆盖同名场景的字段）。
 
-    与事件种子一致：已存在的自定义场景不被删除；种子移除的场景保持库内原样。
+    与事件种子一致：已存在的自定义场景不被删除；种子移除的场景保持库内原样；
+    启停状态（enabled）不受种子影响，已有记录保留库内值。
     """
     path = SEEDS_DIR / "scenes.json"
     if not path.exists():
@@ -172,11 +179,16 @@ def apply_scene_seeds(session: Session) -> None:
             "once": bool(item.get("once", False)),
             "cooldown_minutes": int(item.get("cooldown_minutes", 0) or 0),
             "priority": int(item.get("priority", 0) or 0),
-            "enabled": bool(item.get("enabled", True)),
         }
         definition = existing.get(key)
         if definition is None:
-            session.add(SceneDef(key=key, **fields))
+            session.add(
+                SceneDef(
+                    key=key,
+                    enabled=bool(item.get("enabled", True)),
+                    **fields,
+                )
+            )
             added += 1
             continue
         if any(getattr(definition, name) != value for name, value in fields.items()):

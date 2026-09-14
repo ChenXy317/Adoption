@@ -151,7 +151,10 @@ def end_scene(
             select(SceneDef).where(SceneDef.key == str(active.get("key") or ""))
         )
         if req.abort:
-            aborted = scenes.abort_scene(session, save_id, scene, active)
+            now_abs = clock.absolute_minutes(save.game_minutes, save.settings or {})
+            aborted = scenes.abort_scene(
+                session, save_id, scene, active, now_abs=now_abs
+            )
             session.commit()
             return {
                 "scene": scenes.brief(aborted),

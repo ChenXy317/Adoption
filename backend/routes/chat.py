@@ -235,7 +235,7 @@ def _settle(save_id: int, text: str, tag_raw: str, interrupted: bool) -> dict:
                 "changes": combined,
                 "ai_changes": changes,
                 "phase": phase_of(values),
-                "tendency": tendency_of(values, behavior_count(session, save_id)),
+                "tendency": tendency_of(values, behavior_count(session, save_id))[1],
                 "mood_label": mood_label,
                 "time_advance": total_advance,
                 "game_minutes": save.game_minutes,
@@ -286,6 +286,7 @@ async def chat(save_id: int, req: ChatIn, background: BackgroundTasks):
         stripper = StateTagStripper()
         collected: list[str] = []
         error_payload = None
+        settle_started = False
         try:
             try:
                 async for text in ai.stream_chat(
@@ -303,7 +304,7 @@ async def chat(save_id: int, req: ChatIn, background: BackgroundTasks):
             except AIClientError as e:
                 error_payload = {"code": e.error_code, "message": str(e)}
         except (asyncio.CancelledError, GeneratorExit):
-            if collected or stripper.tag_found:
+            if not settle_started and (collected or stripper.tag_found):
                 _settle_in_thread(save_id, "".join(collected), stripper.state_raw)
             raise
 
@@ -321,6 +322,7 @@ async def chat(save_id: int, req: ChatIn, background: BackgroundTasks):
             )
             return
         settled = None
+        settle_started = True
         try:
             settled = await run_in_threadpool(
                 _settle, save_id, text, stripper.state_raw, error_payload is not None

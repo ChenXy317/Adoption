@@ -333,7 +333,10 @@ def _finish_job(
 
 
 def _prepare_summary(save_id: int) -> dict | None:
-    """线程池同步段：抢占任务、收集消息/事件/已有记忆，解析总结模型。"""
+    """线程池同步段：抢占任务、收集消息/事件/已有记忆，解析总结模型。
+
+    抢占成功后的任何异常都会把任务落 failed，避免卡在 running 状态。
+    """
     session = SessionLocal()
     try:
         save = session.get(Save, save_id)
@@ -342,64 +345,79 @@ def _prepare_summary(save_id: int) -> dict | None:
         job = _claim_job(session, save_id)
         if job is None:
             return None
-        messages = list(
-            session.scalars(
-                select(Message)
-                .where(
-                    Message.save_id == save_id,
-                    Message.id > int(save.last_summarized_message_id or 0),
-                )
-                .order_by(Message.id)
-                .limit(MEMORY_MAX_MESSAGES_PER_JOB)
-            )
-        )
-        if not messages:
-            _finish_job(session, job.id, "done")
-            session.commit()
-            return None
-        first_at = int(messages[0].game_minutes_at or 0)
-        logs = list(
-            session.scalars(
-                select(EventLog)
-                .where(
-                    EventLog.save_id == save_id,
-                    EventLog.game_minutes_at >= first_at,
-                )
-                .order_by(EventLog.id)
-                .limit(50)
-            )
-        )
-        existing = list(
-            session.scalars(
-                select(Memory)
-                .where(Memory.save_id == save_id, Memory.status == "active")
-                .order_by(Memory.created_at.desc())
-                .limit(MEMORY_EXISTING_LIMIT)
-            )
-        )
-        model_key = (
-            str((save.settings or {}).get("memory_model") or "").strip()
-            or (MEMORY_MODEL or "").strip()
-            or save.model_key
-        )
         try:
-            runtime = get_runtime(session, model_key, http=False)
-        except AIClientError as e:
-            _finish_job(session, job.id, "failed", str(e))
-            session.commit()
+            messages = list(
+                session.scalars(
+                    select(Message)
+                    .where(
+                        Message.save_id == save_id,
+                        Message.id > int(save.last_summarized_message_id or 0),
+                    )
+                    .order_by(Message.id)
+                    .limit(MEMORY_MAX_MESSAGES_PER_JOB)
+                )
+            )
+            if not messages:
+                _finish_job(session, job.id, "done")
+                session.commit()
+                return None
+            first_at = int(messages[0].game_minutes_at or 0)
+            logs = list(
+                session.scalars(
+                    select(EventLog)
+                    .where(
+                        EventLog.save_id == save_id,
+                        EventLog.game_minutes_at >= first_at,
+                    )
+                    .order_by(EventLog.id)
+                    .limit(50)
+                )
+            )
+            existing = list(
+                session.scalars(
+                    select(Memory)
+                    .where(Memory.save_id == save_id, Memory.status == "active")
+                    .order_by(Memory.created_at.desc())
+                    .limit(MEMORY_EXISTING_LIMIT)
+                )
+            )
+            model_key = (
+                str((save.settings or {}).get("memory_model") or "").strip()
+                or (MEMORY_MODEL or "").strip()
+                or save.model_key
+            )
+            try:
+                runtime = get_runtime(session, model_key, http=False)
+            except AIClientError as e:
+                _finish_job(session, job.id, "failed", str(e))
+                session.commit()
+                return None
+            return {
+                "save_id": save_id,
+                "job_id": job.id,
+                "last_message_id": int(messages[-1].id),
+                "prompt_messages": build_summary_messages(save, messages, logs, existing),
+                "model_id": runtime["model_id"],
+                "base_url": runtime["base_url"],
+                "api_key": runtime["api_key"],
+                "message_count": len(messages),
+            }
+        except Exception as e:
+            logger.exception("记忆总结准备阶段失败（save=%s job=%s）", save_id, job.id)
+            _fail_job_in_session(session, job.id, str(e))
             return None
-        return {
-            "save_id": save_id,
-            "job_id": job.id,
-            "last_message_id": int(messages[-1].id),
-            "prompt_messages": build_summary_messages(save, messages, logs, existing),
-            "model_id": runtime["model_id"],
-            "base_url": runtime["base_url"],
-            "api_key": runtime["api_key"],
-            "message_count": len(messages),
-        }
     finally:
         session.close()
+
+
+def _fail_job_in_session(session: Session, job_id: int, error: str) -> None:
+    """在已打开的会话中安全落失败状态（供准备阶段异常兜底）。"""
+    try:
+        session.rollback()
+        _finish_job(session, job_id, "failed", error)
+        session.commit()
+    except Exception:
+        logger.exception("记忆总结任务失败状态落库失败（job=%s）", job_id)
 
 
 def _apply_summary(prepared: dict, raw: str) -> dict | None:

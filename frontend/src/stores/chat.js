@@ -58,7 +58,6 @@ export const useChatStore = defineStore("chat", {
       const controller = new AbortController();
       activeController = controller;
       let settled = false;
-      let failed = false;
       let hadText = false;
       let eventTriggered = false;
       let sceneChanged = false;
@@ -94,7 +93,6 @@ export const useChatStore = defineStore("chat", {
               }
             },
             error: (data) => {
-              failed = true;
               this.error = data.message;
               ui.toast("error", data.message);
             },
@@ -102,7 +100,6 @@ export const useChatStore = defineStore("chat", {
           controller.signal
         );
       } catch (e) {
-        failed = true;
         if (e.name !== "AbortError") {
           this.error = e.message;
           ui.toast("error", e.message);
@@ -112,7 +109,7 @@ export const useChatStore = defineStore("chat", {
         assistant.streaming = false;
         this.streaming = false;
         hadText = Boolean(assistant.content.trim());
-        if (failed && !hadText) this._dropMessage(assistant);
+        if (assistant.id < 0 && !hadText) this._dropMessage(assistant);
         if (settled || eventTriggered || sceneChanged || hadText) {
           game.loadState(saveId).catch(() => {});
         }

@@ -139,10 +139,14 @@ class AIClient:
             for k in ("temperature", "top_p", "presence_penalty", "frequency_penalty"):
                 if k in params:
                     kwargs[k] = params[k]
-        if params and params.get("num_predict") is not None:
-            requested = params["num_predict"]
-            cap = max_tokens if max_tokens is not None else requested
-            max_tokens = min(requested, cap)
+        if params and params.get("num_predict"):
+            try:
+                requested = int(params["num_predict"])
+            except (TypeError, ValueError):
+                requested = 0
+            if requested > 0:
+                cap = max_tokens if max_tokens is not None else requested
+                max_tokens = min(requested, cap)
         if max_tokens is not None:
             kwargs["max_tokens"] = max_tokens
         return kwargs

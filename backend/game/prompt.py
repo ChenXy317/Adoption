@@ -19,16 +19,18 @@ from orm import AttributeDef, Character, Message, Save
 STATE_PROTOCOL = """\
 # 状态标签协议（必须遵守）
 每次回复的正文结束后，必须另起一行输出状态标签，格式：
-<<<STATE {"attrs":{"属性key":变化量},"time":{"advance_minutes":分钟数}} STATE>>>
+<<<STATE {"attrs":{"属性key":变化量},"mood_label":"心情短语","flags":{"剧情标记":true},"time":{"advance_minutes":分钟数}} STATE>>>
 要求：
 - attrs：本次互动中明确变化的属性增量（整数），key 只能取当前状态里列出的属性；没有变化时输出 {}。
+- mood_label：她此刻的心情短语（2-6 个字，如「开心」「不安」「害羞」）；情绪没有明显变化时省略。
+- flags：需要长期记住的剧情标记（键名以小写字母开头，只用小写字母、数字、下划线）；一般不需要输出，没有就省略。
 - time：本次互动在故事中经过的虚拟分钟数（0-180 的整数），没有时间流逝则输出 0。
 - scene：仅在进行中的场景、且本幕该收尾时输出 {"action":"end","summary":"一句话总结本幕"}；场景继续时不要输出。
 - 无论是否有变化都必须输出标签；标签对玩家不可见，不要在正文中提及或解释标签。
 
 示例：
 「先喝点热的吧，别着凉了。」她把杯子轻轻推到你面前。
-<<<STATE {"attrs":{"affection":1,"trust":1},"time":{"advance_minutes":5}} STATE>>>"""
+<<<STATE {"attrs":{"affection":1,"trust":1},"mood_label":"害羞","time":{"advance_minutes":5}} STATE>>>"""
 
 STATE_REMINDER = (
     "提醒：本条回复结束前必须另起一行输出 <<<STATE ... STATE>>> 状态标签，"

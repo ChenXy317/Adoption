@@ -339,6 +339,7 @@ def finish_scene(
         "attrs": attr_changes,
         "finished_game_minutes": int(save.game_minutes),
     }
+    log.game_minutes_at = ctx.absolute
     log.finished_at = datetime.now()
 
     session.add(
@@ -389,7 +390,14 @@ def finish_scene(
     }
 
 
-def abort_scene(session: Session, save_id: int, scene: SceneDef | None, active: dict) -> dict:
+def abort_scene(
+    session: Session,
+    save_id: int,
+    scene: SceneDef | None,
+    active: dict,
+    *,
+    now_abs: int | None = None,
+) -> dict:
     """强制中止（调试）：清 active 并记 aborted；不应用 effects、不写记忆与收尾消息。"""
     key = str(active.get("key") or "")
     log = _latest_open_log(session, save_id, key) if key else None
@@ -397,6 +405,8 @@ def abort_scene(session: Session, save_id: int, scene: SceneDef | None, active: 
         log.status = "aborted"
         log.meta = {**(log.meta or {}), "reason": "abort"}
         log.finished_at = datetime.now()
+        if now_abs is not None:
+            log.game_minutes_at = int(now_abs)
     clear_active(session, save_id)
     return {
         "key": key,

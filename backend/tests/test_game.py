@@ -12,6 +12,7 @@ from game.attributes import (
     tendency_of,
 )
 from game.prompt import (
+    STATE_PROTOCOL,
     _event_block,
     _persona_block,
     _sample_lines_block,
@@ -299,6 +300,11 @@ class PromptTest(unittest.TestCase):
         self.assertIn("【噩梦】她在夜里惊醒。", block)
         self.assertNotIn("空事件", block)
         self.assertEqual(_event_block([]), "")
+
+    def test_state_protocol_covers_mood_and_flags(self):
+        self.assertIn("mood_label", STATE_PROTOCOL)
+        self.assertIn("flags", STATE_PROTOCOL)
+        self.assertIn("scene", STATE_PROTOCOL)
 
 
 if __name__ == "__main__":

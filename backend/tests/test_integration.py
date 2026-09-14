@@ -48,6 +48,7 @@ from orm import (
     SceneLog,
 )
 from schemas import AdvanceIn, SceneEndIn, SceneEnterIn
+from seeds.loader import apply_event_seeds, apply_scene_seeds
 
 TEST_DATABASE = f"{MYSQL_DATABASE}_test"
 
@@ -588,6 +589,7 @@ class SettlementIntegrationTest(unittest.TestCase):
         self.assertTrue(result["parsed"])
         self.assertEqual(result["time_advance"], 30)
         self.assertEqual(result["game_minutes"], 30)
+        self.assertIsInstance(result["tendency"], str)
         session.expire_all()
         assistant = session.scalar(
             select(Message).where(
@@ -666,6 +668,101 @@ class SettlementIntegrationTest(unittest.TestCase):
         )
         self.assertEqual(job.status, "failed")
         self.assertIn("boom", job.error)
+
+    def test_prepare_summary_failure_marks_job_failed(self):
+        session = self._session()
+        defs = self._defs(session)
+        self._add_provider(session)
+        save, _values = self._save(session, defs, model_key="testprov:model-a")
+        self._add_messages(session, save.id, 3)
+        session.commit()
+
+        with mock.patch.object(
+            memory, "build_summary_messages", side_effect=RuntimeError("采集失败")
+        ):
+            prepared = memory._prepare_summary(save.id)
+
+        self.assertIsNone(prepared)
+        session.expire_all()
+        job = session.scalar(
+            select(MemoryJob)
+            .where(MemoryJob.save_id == save.id)
+            .order_by(MemoryJob.id.desc())
+        )
+        self.assertEqual(job.status, "failed")
+        self.assertIn("采集失败", job.error)
+
+    def test_scene_cooldown_starts_at_finish_time(self):
+        session = self._session()
+        defs = self._defs(session)
+        save, values = self._save(session, defs)
+        session.add(
+            SceneDef(
+                key="cd_scene", name="冷却场景", category="story",
+                enter_trigger={}, enter_cost={}, scene_prompt="", goal="",
+                min_turns=0, max_turns=5, exit={}, effects={},
+                next_scenes=[], once=False, cooldown_minutes=10080,
+                priority=50, enabled=True,
+            )
+        )
+        session.commit()
+
+        events.settle_time(session, save, defs, values, 10, source="chat")
+        session.commit()
+        self.assertEqual(scenes.get_active(session, save.id)["key"], "cd_scene")
+
+        events.settle_time(
+            session, save, defs, values, 10 + 2 * clock.DAY_MINUTES, source="chat"
+        )
+        session.commit()
+        scene = session.scalar(select(SceneDef).where(SceneDef.key == "cd_scene"))
+        active = scenes.get_active(session, save.id)
+        ctx = events.build_context(session, save, values)
+        scenes.finish_scene(
+            session, save, scene, active, ctx, values, {d.key: d for d in defs},
+            reason="manual",
+        )
+        session.commit()
+
+        finish_abs = clock.absolute_minutes(save.game_minutes, {})
+        _, last_at = scenes.load_scene_stats(session, save.id)
+        self.assertEqual(last_at["cd_scene"], finish_abs)
+
+    def test_event_seed_keeps_enabled_state(self):
+        session = self._session()
+        apply_event_seeds(session)
+        row = session.scalar(
+            select(EventDef).where(EventDef.key == "work_convenience")
+        )
+        self.assertIsNotNone(row)
+        row.enabled = False
+        session.commit()
+
+        apply_event_seeds(session)
+
+        session.expire_all()
+        row = session.scalar(
+            select(EventDef).where(EventDef.key == "work_convenience")
+        )
+        self.assertFalse(row.enabled)
+
+    def test_scene_seed_keeps_enabled_state(self):
+        session = self._session()
+        apply_scene_seeds(session)
+        row = session.scalar(
+            select(SceneDef).where(SceneDef.key == "date_first_outing")
+        )
+        self.assertIsNotNone(row)
+        row.enabled = False
+        session.commit()
+
+        apply_scene_seeds(session)
+
+        session.expire_all()
+        row = session.scalar(
+            select(SceneDef).where(SceneDef.key == "date_first_outing")
+        )
+        self.assertFalse(row.enabled)
 
 
 class ErrorFormatTest(unittest.TestCase):
