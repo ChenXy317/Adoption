@@ -79,6 +79,26 @@ class MemoryPatch(BaseModel):
     status: str | None = Field(default=None, max_length=16)
 
 
+class CharacterPatch(BaseModel):
+    """女主角设定书编辑；persona 为结构化设定内容。"""
+
+    name: str | None = Field(default=None, min_length=1, max_length=64)
+    age: int | None = Field(default=None, ge=18, le=99)
+    relation: str | None = Field(default=None, max_length=64)
+    persona: dict | None = None
+    freeform: str | None = Field(default=None, max_length=20000)
+
+    @field_validator("name")
+    @classmethod
+    def _strip_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        text = value.strip()
+        if not text:
+            raise ValueError("角色名不能为空")
+        return text
+
+
 class AttributeDefIn(BaseModel):
     key: str = Field(min_length=1, max_length=64, pattern=r"^[a-z][a-z0-9_]{0,63}$")
     name: str = Field(min_length=1, max_length=64)

@@ -154,6 +154,40 @@ def _migrate_attribute_double() -> None:
             logger.info("已升级 %s.%s 为 DOUBLE", table, column)
 
 
+def _migrate_user_edited() -> None:
+    """为角色书与事件/场景定义补充「用户已修改」标记列（用户改动不再被种子覆盖）。"""
+    from sqlalchemy import text
+
+    with engine.begin() as conn:
+        tables = [
+            row[0]
+            for row in conn.execute(
+                text(
+                    "SELECT TABLE_NAME FROM information_schema.TABLES "
+                    "WHERE TABLE_SCHEMA = DATABASE() "
+                    "AND TABLE_NAME IN ('characters', 'event_defs', 'scene_defs')"
+                )
+            ).fetchall()
+        ]
+        for table in tables:
+            exists = conn.execute(
+                text(
+                    "SELECT COUNT(*) FROM information_schema.COLUMNS "
+                    "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t "
+                    "AND COLUMN_NAME = 'user_edited'"
+                ),
+                {"t": table},
+            ).scalar()
+            if not exists:
+                conn.execute(
+                    text(
+                        f"ALTER TABLE `{table}` ADD COLUMN `user_edited` "
+                        "TINYINT(1) NOT NULL DEFAULT 0"
+                    )
+                )
+                logger.info("已为 %s 添加 user_edited 列", table)
+
+
 def init_db() -> None:
     """建库 + 建表 + 结构迁移（幂等）。"""
     ensure_database()
@@ -162,6 +196,7 @@ def init_db() -> None:
     Base.metadata.create_all(engine)
     _migrate_character_global()
     _migrate_attribute_double()
+    _migrate_user_edited()
     logger.info("数据库 %s 初始化完成", MYSQL_DATABASE)
 
 

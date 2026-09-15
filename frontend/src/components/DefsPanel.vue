@@ -22,14 +22,21 @@
           :class="{ active: tab === 'events' }"
           @click="switchTab('events')"
         >
-          事件定义
+          事件书
         </button>
         <button
           class="btn"
           :class="{ active: tab === 'scenes' }"
           @click="switchTab('scenes')"
         >
-          场景定义
+          场景书
+        </button>
+        <button
+          class="btn"
+          :class="{ active: tab === 'character' }"
+          @click="switchTab('character')"
+        >
+          角色书
         </button>
         <select
           v-if="tab === 'events'"
@@ -43,7 +50,9 @@
 
       <p v-if="error" class="error">{{ error }}</p>
 
-      <div class="defs-body">
+      <CharacterEditor v-if="tab === 'character'" />
+
+      <div v-else class="defs-body">
         <aside class="def-list">
           <button class="btn" style="width: 100%" @click="startCreate">
             + 新建{{ tab === "events" ? "事件" : "场景" }}
@@ -62,13 +71,14 @@
             <div class="dim small">
               {{ item.key }} · {{ item.category
               }}<template v-if="item.from_seed"> · 内置</template>
+              <span v-if="item.user_edited" class="edited-tag">· 已修改</span>
             </div>
           </div>
         </aside>
 
         <section class="def-detail">
           <div v-if="!selected && !creating" class="dim">
-            选择左侧定义进行编辑，或新建一个。内置定义由种子文件维护，重启后会恢复其字段（启停状态除外）。
+            选择左侧定义进行编辑，或新建一个。内置定义保存后会标记「已修改」，重启不再被种子覆盖，可随时恢复内置。
           </div>
           <template v-else>
             <div class="field">
@@ -118,6 +128,14 @@
               </template>
             </div>
             <div class="row" style="justify-content: flex-end; margin-top: 12px">
+              <button
+                v-if="!creating && selected?.from_seed && selected?.user_edited"
+                class="btn"
+                :disabled="busy"
+                @click="resetSelected"
+              >
+                恢复内置
+              </button>
               <button v-if="!creating" class="btn danger" @click="remove">
                 删除
               </button>
@@ -136,6 +154,7 @@
 import { computed, onMounted, reactive, ref } from "vue";
 
 import { apiDelete, apiGet, apiPatch, apiPost } from "../api/client";
+import CharacterEditor from "./CharacterEditor.vue";
 import { useUiStore } from "../stores/ui";
 
 defineEmits(["close"]);
@@ -288,6 +307,7 @@ async function switchTab(next) {
   creating.value = false;
   error.value = "";
   resetDraft();
+  if (next === "character") return;
   try {
     await loadItems();
   } catch (e) {
@@ -345,6 +365,30 @@ async function remove() {
     await loadItems();
   } catch (e) {
     error.value = e.message;
+  }
+}
+
+async function resetSelected() {
+  if (!selected.value) return;
+  if (
+    !window.confirm(
+      `把「${selected.value.name}」恢复为内置定义？当前的修改将被覆盖。`
+    )
+  ) {
+    return;
+  }
+  error.value = "";
+  busy.value = true;
+  try {
+    const data = await apiPost(`${apiPath()}/${selected.value.id}/reset`);
+    ui.toast("ok", "已恢复内置内容");
+    await loadItems();
+    const fresh = items.value.find((item) => item.id === data.id);
+    if (fresh) select(fresh);
+  } catch (e) {
+    error.value = e.message;
+  } finally {
+    busy.value = false;
   }
 }
 
@@ -441,6 +485,10 @@ onMounted(async () => {
 
 .def-name {
   font-size: 13px;
+}
+
+.edited-tag {
+  color: var(--warn);
 }
 
 .def-detail {

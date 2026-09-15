@@ -264,6 +264,7 @@ def character_dict(character: Character | None) -> dict | None:
         "relation": character.relation,
         "persona": character.persona or {},
         "freeform": character.freeform or "",
+        "user_edited": bool(character.user_edited),
         "updated_at": character.updated_at,
     }
 

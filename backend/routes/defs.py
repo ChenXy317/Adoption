@@ -2,7 +2,7 @@
 定义管理 — 属性 / 事件 / 场景定义 CRUD（PLAN 5.2 / 5.3）。
 
 所有 key 创建后不可改（避免引用孤儿），仅支持启停与字段调整；
-事件/场景定义标出内置（种子）来源，内置定义重启时会被种子恢复字段。
+内置定义标出种子来源：用户修改过的定义不再被种子覆盖，并可在界面恢复内置内容。
 """
 from __future__ import annotations
 
@@ -25,6 +25,7 @@ from schemas import (
     SceneDefIn,
     SceneDefPatch,
 )
+from seeds.loader import event_seed_fields, scene_seed_fields
 
 router = APIRouter(tags=["defs"])
 
@@ -138,31 +139,36 @@ def delete_attribute_def(
 
 # ── 事件定义 ──
 
-_seed_keys_cache: dict[str, tuple[float, set[str]]] = {}
+_seed_items_cache: dict[str, tuple[float, dict[str, dict]]] = {}
 
 
-def _seed_keys(filename: str) -> set[str]:
-    """读取种子文件中定义的 key 集合（按 mtime 缓存，供内置定义标记复用）。"""
+def _seed_items(filename: str) -> dict[str, dict]:
+    """读取种子文件中 key -> 定义 的映射（按 mtime 缓存）。"""
     path = SEEDS_DIR / filename
     try:
         mtime = path.stat().st_mtime
     except OSError:
-        return set()
-    cached = _seed_keys_cache.get(filename)
+        return {}
+    cached = _seed_items_cache.get(filename)
     if cached is not None and cached[0] == mtime:
         return cached[1]
     try:
         with open(path, encoding="utf-8") as f:
-            items = json.load(f)
+            raw = json.load(f)
     except (OSError, json.JSONDecodeError):
-        return set()
-    keys = {
-        str(item.get("key") or "").strip()
-        for item in items
+        return {}
+    mapping = {
+        str(item.get("key") or "").strip(): item
+        for item in raw
         if isinstance(item, dict) and str(item.get("key") or "").strip()
     }
-    _seed_keys_cache[filename] = (mtime, keys)
-    return keys
+    _seed_items_cache[filename] = (mtime, mapping)
+    return mapping
+
+
+def _seed_keys(filename: str) -> set[str]:
+    """种子文件中已定义的 key 集合（供内置定义标记复用）。"""
+    return set(_seed_items(filename))
 
 
 def _event_dict(d: EventDef, seed_keys: set[str]) -> dict:
@@ -180,6 +186,7 @@ def _event_dict(d: EventDef, seed_keys: set[str]) -> dict:
         "priority": int(d.priority or 0),
         "enabled": bool(d.enabled),
         "from_seed": d.key in seed_keys,
+        "user_edited": bool(d.user_edited),
     }
 
 
@@ -203,6 +210,7 @@ def _scene_dict(d: SceneDef, seed_keys: set[str]) -> dict:
         "priority": int(d.priority or 0),
         "enabled": bool(d.enabled),
         "from_seed": d.key in seed_keys,
+        "user_edited": bool(d.user_edited),
     }
 
 
@@ -245,6 +253,24 @@ def update_event_def(
         if value is None:
             continue
         setattr(definition, name, value)
+    if set(fields) - {"enabled"}:
+        definition.user_edited = True
+    session.commit()
+    return _event_dict(definition, _seed_keys("events.json"))
+
+
+@router.post("/api/event-defs/{def_id}/reset")
+def reset_event_def(def_id: int, session: Session = Depends(get_session)):
+    """把内置事件恢复为种子内容（启停状态保留用户设置）。"""
+    definition = session.get(EventDef, def_id)
+    if definition is None:
+        error("def_not_found", "事件不存在", 404)
+    item = _seed_items("events.json").get(definition.key)
+    if item is None:
+        error("not_seed", "该事件不是内置定义，没有可恢复的种子内容", 400)
+    for name, value in event_seed_fields(item).items():
+        setattr(definition, name, value)
+    definition.user_edited = False
     session.commit()
     return _event_dict(definition, _seed_keys("events.json"))
 
@@ -310,6 +336,24 @@ def update_scene_def(
         if name == "next_scenes":
             value = _clean_scene_keys(value)
         setattr(definition, name, value)
+    if set(fields) - {"enabled"}:
+        definition.user_edited = True
+    session.commit()
+    return _scene_dict(definition, _seed_keys("scenes.json"))
+
+
+@router.post("/api/scene-defs/{def_id}/reset")
+def reset_scene_def(def_id: int, session: Session = Depends(get_session)):
+    """把内置场景恢复为种子内容（启停状态保留用户设置）。"""
+    definition = session.get(SceneDef, def_id)
+    if definition is None:
+        error("def_not_found", "场景不存在", 404)
+    item = _seed_items("scenes.json").get(definition.key)
+    if item is None:
+        error("not_seed", "该场景不是内置定义，没有可恢复的种子内容", 400)
+    for name, value in scene_seed_fields(item).items():
+        setattr(definition, name, value)
+    definition.user_edited = False
     session.commit()
     return _scene_dict(definition, _seed_keys("scenes.json"))
 

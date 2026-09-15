@@ -58,6 +58,7 @@ class Character(Base):
     relation: Mapped[str] = mapped_column(String(64), default="", nullable=False)
     persona: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     freeform: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    user_edited: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now, onupdate=datetime.now
@@ -108,6 +109,7 @@ class EventDef(Base):
     cooldown_minutes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     priority: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    user_edited: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
 
 class EventLog(Base):
@@ -149,6 +151,7 @@ class SceneDef(Base):
     cooldown_minutes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     priority: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    user_edited: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
 
 class SceneLog(Base):
