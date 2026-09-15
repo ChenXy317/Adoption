@@ -50,6 +50,7 @@ defineEmits(["close"]);
 }
 
 .side-drawer {
+  position: relative;
   width: 0;
   max-width: 0;
   opacity: 0;
@@ -60,14 +61,36 @@ defineEmits(["close"]);
   min-height: 0;
   pointer-events: none;
   transition:
-    width 0.18s ease,
-    max-width 0.18s ease,
-    opacity 0.15s ease,
-    transform 0.18s ease;
-  background: var(--panel);
+    width 0.22s var(--ease-spring),
+    max-width 0.22s var(--ease-spring),
+    opacity 0.18s ease,
+    transform 0.22s var(--ease-spring);
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  backdrop-filter: blur(18px) saturate(1.25);
   border: 1px solid transparent;
   border-radius: var(--radius);
   box-shadow: none;
+}
+
+/* 抽屉内的侧向渐变光带 */
+.side-drawer::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8%;
+  bottom: 8%;
+  width: 1px;
+  border-radius: 1px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    rgba(139, 92, 246, 0.65) 30%,
+    rgba(232, 121, 249, 0.55) 70%,
+    transparent
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
 }
 
 .side-drawer.open {
@@ -75,8 +98,12 @@ defineEmits(["close"]);
   max-width: 380px;
   opacity: 1;
   pointer-events: auto;
-  border-color: var(--border);
-  box-shadow: var(--shadow-panel);
+  border-color: var(--glass-border);
+  box-shadow: var(--shadow-panel), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.side-drawer.open::after {
+  opacity: 1;
 }
 
 .side-drawer.overlay {
@@ -109,14 +136,16 @@ defineEmits(["close"]);
   padding: 10px 12px 8px;
   border-bottom: 1px solid var(--border-soft);
   flex-shrink: 0;
+  background: linear-gradient(180deg, rgba(139, 92, 246, 0.07), transparent);
 }
 
 .drawer-title {
   margin: 0;
   font-size: 13px;
-  font-weight: 600;
-  color: var(--text-dim);
-  letter-spacing: 0.04em;
+  font-weight: 650;
+  color: var(--accent-hover);
+  letter-spacing: 0.14em;
+  text-shadow: 0 0 16px rgba(167, 139, 250, 0.45);
 }
 
 .close-btn {
@@ -126,6 +155,12 @@ defineEmits(["close"]);
   font-size: 18px;
   line-height: 1;
   border-radius: var(--radius-xs);
+  transition: transform var(--ease-spring), background var(--ease), color var(--ease);
+}
+
+.close-btn:hover:not(:disabled) {
+  transform: rotate(90deg);
+  color: var(--accent-hover);
 }
 
 .drawer-body {

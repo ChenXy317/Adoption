@@ -54,16 +54,17 @@ async function run(item) {
   padding: 12px 14px;
 }
 
-.panel h3 {
-  margin: 0 0 10px;
-  font-size: 13px;
-  color: var(--text-dim);
-  font-weight: 600;
-  letter-spacing: 0.04em;
-}
-
 .action {
   margin-bottom: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-xs);
+  border: 1px solid transparent;
+  transition: background var(--ease), border-color var(--ease);
+}
+
+.action:hover {
+  background: rgba(139, 92, 246, 0.06);
+  border-color: var(--border-soft);
 }
 
 .action:last-child {

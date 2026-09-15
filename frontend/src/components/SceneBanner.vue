@@ -50,14 +50,6 @@ async function endScene() {
   padding: 12px 14px;
 }
 
-.panel h3 {
-  margin: 0 0 10px;
-  font-size: 13px;
-  color: var(--text-dim);
-  font-weight: 600;
-  letter-spacing: 0.04em;
-}
-
 .scene-head {
   display: flex;
   justify-content: space-between;
@@ -67,9 +59,10 @@ async function endScene() {
 }
 
 .scene-name {
-  color: var(--accent);
+  color: var(--accent-hover);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 650;
+  text-shadow: 0 0 16px rgba(167, 139, 250, 0.5);
 }
 
 .goal {

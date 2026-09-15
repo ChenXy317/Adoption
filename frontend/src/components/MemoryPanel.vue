@@ -210,10 +210,11 @@ onMounted(load);
 }
 
 .create {
-  border: 1px dashed var(--border);
+  border: 1px dashed var(--accent-border);
   border-radius: 8px;
   padding: 10px;
   margin: 10px 0;
+  background: rgba(139, 92, 246, 0.05);
 }
 
 .memory-item {
@@ -221,7 +222,14 @@ onMounted(load);
   border-radius: 8px;
   padding: 10px;
   margin-top: 10px;
-  background: var(--bg-soft);
+  background: color-mix(in srgb, var(--bg-soft) 78%, transparent);
+  animation: fadeInUp 0.3s var(--ease-spring) both;
+  transition: border-color var(--ease), box-shadow var(--ease-spring);
+}
+
+.memory-item:hover {
+  border-color: var(--accent-border);
+  box-shadow: var(--glow-soft);
 }
 
 .memory-item.archived {

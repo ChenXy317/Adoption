@@ -129,31 +129,31 @@ const openDir = ref(null);
 const useOverlay = ref(false);
 
 const DIR_META = {
-  status: "状态",
-  wallet: "钱包",
-  advance: "推进",
-  actions: "行动",
-  events: "事件",
-  scene: "场景",
+  status: { label: "状态", icon: "♡" },
+  wallet: { label: "钱包", icon: "¥" },
+  advance: { label: "推进", icon: "◷" },
+  actions: { label: "行动", icon: "✧" },
+  events: { label: "事件", icon: "✦" },
+  scene: { label: "场景", icon: "◈" },
 };
 
 const hasScene = computed(() => !!game.current?.active_scene);
 
 const navItems = computed(() => {
   const items = [
-    { id: "status", label: DIR_META.status },
-    { id: "wallet", label: DIR_META.wallet },
-    { id: "advance", label: DIR_META.advance },
-    { id: "actions", label: DIR_META.actions },
-    { id: "events", label: DIR_META.events },
+    { id: "status", label: DIR_META.status.label, icon: DIR_META.status.icon },
+    { id: "wallet", label: DIR_META.wallet.label, icon: DIR_META.wallet.icon },
+    { id: "advance", label: DIR_META.advance.label, icon: DIR_META.advance.icon },
+    { id: "actions", label: DIR_META.actions.label, icon: DIR_META.actions.icon },
+    { id: "events", label: DIR_META.events.label, icon: DIR_META.events.icon },
   ];
   if (hasScene.value) {
-    items.push({ id: "scene", label: DIR_META.scene });
+    items.push({ id: "scene", label: DIR_META.scene.label, icon: DIR_META.scene.icon });
   }
   return items;
 });
 
-const drawerTitle = computed(() => (openDir.value ? DIR_META[openDir.value] || "" : ""));
+const drawerTitle = computed(() => (openDir.value ? DIR_META[openDir.value]?.label || "" : ""));
 
 const characterLine = computed(() => {
   const c = game.current?.character;
@@ -241,18 +241,38 @@ async function onCatalogClose() {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: var(--bg);
+  background: transparent;
 }
 
 .topbar {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   padding: 10px 20px;
   border-bottom: 1px solid var(--border);
-  background: var(--bg-soft);
+  background: color-mix(in srgb, var(--bg-soft) 74%, transparent);
+  backdrop-filter: blur(18px) saturate(1.3);
   flex-shrink: 0;
+  z-index: 20;
+}
+
+.topbar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 4%,
+    rgba(139, 92, 246, 0.7) 30%,
+    rgba(232, 121, 249, 0.55) 62%,
+    transparent 96%
+  );
+  pointer-events: none;
 }
 
 .topbar-left {
@@ -282,9 +302,20 @@ async function onCatalogClose() {
 }
 
 .time {
-  color: var(--accent);
   font-size: 12px;
-  letter-spacing: 0.02em;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  background: linear-gradient(90deg, #67e8f9, #a78bfa 52%, #f0abfc);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+html[data-theme="light"] .time {
+  background: linear-gradient(90deg, #0e7490, #6d28d9 52%, #a21caf);
+  -webkit-background-clip: text;
+  background-clip: text;
 }
 
 .topbar-right {
@@ -315,6 +346,18 @@ async function onCatalogClose() {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+  background:
+    radial-gradient(ellipse 80% 46% at 50% -4%, rgba(139, 92, 246, 0.1), transparent 72%),
+    radial-gradient(ellipse 40% 30% at 96% 104%, rgba(232, 121, 249, 0.07), transparent 74%),
+    color-mix(in srgb, var(--panel) 88%, transparent);
+  backdrop-filter: blur(10px);
+}
+
+html[data-theme="light"] .chat {
+  background:
+    radial-gradient(ellipse 80% 46% at 50% -4%, rgba(124, 58, 237, 0.06), transparent 72%),
+    radial-gradient(ellipse 40% 30% at 96% 104%, rgba(192, 38, 211, 0.05), transparent 74%),
+    color-mix(in srgb, var(--panel) 92%, transparent);
 }
 
 .side-shell {
@@ -330,7 +373,7 @@ async function onCatalogClose() {
 .status-block {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 6px;
 }
 
 .meta {
@@ -340,17 +383,25 @@ async function onCatalogClose() {
 
 .phase,
 .mood {
-  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: linear-gradient(120deg, var(--accent-soft), rgba(232, 121, 249, 0.1));
+  border: 1px solid var(--accent-border);
+  color: var(--accent-hover);
   font-size: 12px;
-  margin: 2px 0;
   line-height: 1.45;
+  box-shadow: var(--glow-soft);
+  width: fit-content;
 }
 
 .mood {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .phase:last-of-type {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 </style>

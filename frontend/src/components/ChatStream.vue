@@ -9,8 +9,9 @@
         {{ chat.loadingEarlier ? "加载中…" : "加载更早的消息" }}
       </button>
     </div>
-    <div v-if="!chat.messages.length" class="empty dim">
-      还没有对话，说点什么吧。
+    <div v-if="!chat.messages.length" class="empty">
+      <div class="empty-orb" aria-hidden="true">✦</div>
+      <p class="empty-text dim">还没有对话，说点什么吧。</p>
     </div>
     <MessageBubble
       v-for="m in chat.messages"
@@ -65,16 +66,52 @@ async function loadEarlier() {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 20px 22px;
+  gap: 16px;
+  padding: 22px 24px;
   background: transparent;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 22px,
+    #000 calc(100% - 4px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 22px,
+    #000 calc(100% - 4px),
+    transparent 100%
+  );
 }
 
 .empty {
-  text-align: center;
-  margin-top: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: 64px;
+}
+
+.empty-orb {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  font-size: 22px;
+  color: var(--accent-hover);
+  background: radial-gradient(circle at 32% 28%, rgba(240, 171, 252, 0.35), rgba(139, 92, 246, 0.12) 62%);
+  border: 1px solid var(--accent-border);
+  box-shadow: 0 0 34px -6px rgba(167, 139, 250, 0.8);
+  text-shadow: 0 0 18px rgba(240, 171, 252, 0.95);
+  animation: floatY 4.5s ease-in-out infinite;
+}
+
+.empty-text {
+  margin: 0;
   font-size: 13px;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
 }
 
 .load-earlier {

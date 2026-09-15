@@ -407,15 +407,19 @@ async function test(m) {
   border-radius: 8px;
   border: 1px solid transparent;
   cursor: pointer;
+  transition: background var(--ease), border-color var(--ease),
+    transform var(--ease-spring), box-shadow var(--ease);
 }
 
 .provider-item:hover {
   background: var(--bg-soft);
+  transform: translateX(2px);
 }
 
 .provider-item.active {
-  background: var(--accent-soft);
+  background: linear-gradient(125deg, var(--accent-soft), rgba(232, 121, 249, 0.1));
   border-color: var(--accent);
+  box-shadow: var(--glow-soft);
 }
 
 .detail {
@@ -426,6 +430,8 @@ async function test(m) {
 .detail h3 {
   margin: 8px 0 12px;
   font-size: 14px;
+  color: var(--accent-hover);
+  text-shadow: 0 0 16px rgba(167, 139, 250, 0.35);
 }
 
 .model-row {
@@ -433,8 +439,14 @@ async function test(m) {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  padding: 6px 0;
+  padding: 6px 8px;
+  border-radius: 8px;
   border-bottom: 1px dashed var(--border);
+  transition: background var(--ease);
+}
+
+.model-row:hover {
+  background: rgba(139, 92, 246, 0.05);
 }
 
 .key {

@@ -64,14 +64,6 @@ async function run(payload) {
   padding: 12px 14px;
 }
 
-.panel h3 {
-  margin: 0 0 10px;
-  font-size: 13px;
-  color: var(--text-dim);
-  font-weight: 600;
-  letter-spacing: 0.04em;
-}
-
 .grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

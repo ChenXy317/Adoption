@@ -391,9 +391,10 @@ onMounted(async () => {
 }
 
 .tabs .btn.active {
-  background: var(--accent-soft);
+  background: linear-gradient(125deg, var(--accent-soft), rgba(232, 121, 249, 0.12));
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--accent-hover);
+  box-shadow: var(--glow-soft);
 }
 
 .debug-save {
@@ -423,15 +424,19 @@ onMounted(async () => {
   border-radius: 8px;
   border: 1px solid transparent;
   cursor: pointer;
+  transition: background var(--ease), border-color var(--ease),
+    transform var(--ease-spring), box-shadow var(--ease);
 }
 
 .def-item:hover {
   background: var(--bg-soft);
+  transform: translateX(2px);
 }
 
 .def-item.active {
-  background: var(--accent-soft);
+  background: linear-gradient(125deg, var(--accent-soft), rgba(232, 121, 249, 0.1));
   border-color: var(--accent);
+  box-shadow: var(--glow-soft);
 }
 
 .def-name {

@@ -72,21 +72,30 @@ async function run(item) {
   padding: 12px 14px;
 }
 
-.panel h3 {
-  margin: 0 0 10px;
-  font-size: 13px;
-  color: var(--text-dim);
-  font-weight: 600;
-  letter-spacing: 0.04em;
-}
-
 .money {
-  font-size: 22px;
+  display: inline-block;
+  font-size: 26px;
   font-weight: 700;
-  color: var(--warn);
-  margin-bottom: 10px;
+  margin-bottom: 12px;
   letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
+  background: var(--grad-warm);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: breathe 5.5s ease-in-out infinite;
+}
+
+.money::after {
+  content: "✦";
+  margin-left: 8px;
+  font-size: 13px;
+  vertical-align: 6px;
+  -webkit-text-fill-color: var(--warn);
+  color: var(--warn);
+  text-shadow: 0 0 12px rgba(251, 191, 36, 0.8);
+  animation: dotPulse 2.4s ease-in-out infinite;
 }
 
 .work {

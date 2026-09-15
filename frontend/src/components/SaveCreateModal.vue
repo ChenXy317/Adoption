@@ -87,8 +87,29 @@ async function submit() {
 
 <style scoped>
 .character-card {
-  padding: 10px 12px;
+  position: relative;
+  overflow: hidden;
+  padding: 12px 14px;
   margin-bottom: 14px;
+  background: linear-gradient(125deg, rgba(139, 92, 246, 0.14), rgba(232, 121, 249, 0.08)), var(--panel);
+  border-color: var(--accent-border);
+  box-shadow: var(--glow-soft);
+}
+
+.character-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 10%;
+  bottom: 10%;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--grad-primary);
+  box-shadow: 0 0 14px 1px rgba(139, 92, 246, 0.9);
+}
+
+.character-card > div:first-child {
+  font-weight: 600;
 }
 
 .error {

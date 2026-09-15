@@ -45,12 +45,31 @@ function onEnter(event) {
 
 <style scoped>
 .input-area {
+  position: relative;
   display: flex;
   gap: 12px;
   padding: 14px 18px 16px;
-  border-top: 1px solid var(--border);
-  background: var(--bg-soft);
+  border-top: 1px solid transparent;
+  background: color-mix(in srgb, var(--bg-soft) 76%, transparent);
+  backdrop-filter: blur(14px) saturate(1.2);
   border-radius: 0 0 var(--radius) var(--radius);
+}
+
+.input-area::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(139, 92, 246, 0.5),
+    rgba(232, 121, 249, 0.4),
+    transparent
+  );
+  pointer-events: none;
 }
 
 textarea {
@@ -60,6 +79,11 @@ textarea {
   padding: 10px 12px;
   line-height: 1.55;
   border-radius: var(--radius-xs);
+  background: color-mix(in srgb, var(--bg) 68%, transparent);
+}
+
+textarea:focus {
+  box-shadow: 0 0 0 3px var(--accent-soft), 0 0 30px -8px var(--accent);
 }
 
 .input-area .btn {

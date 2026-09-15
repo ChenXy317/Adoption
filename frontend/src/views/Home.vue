@@ -40,6 +40,7 @@
           :key="save.id"
           class="save-card card"
           @click="enter(save)"
+          @mousemove="spotlight"
         >
           <div class="save-top">
             <strong class="save-name">{{ save.name }}</strong>
@@ -112,6 +113,14 @@ function enter(save) {
   router.push(`/game/${save.id}`);
 }
 
+/** 让卡片内的聚光跟随鼠标位置 */
+function spotlight(event) {
+  const el = event.currentTarget;
+  const rect = el.getBoundingClientRect();
+  el.style.setProperty("--mx", `${event.clientX - rect.left}px`);
+  el.style.setProperty("--my", `${event.clientY - rect.top}px`);
+}
+
 function exportSave(save) {
   const link = document.createElement("a");
   link.href = `/api/saves/${save.id}/export`;
@@ -167,9 +176,10 @@ async function remove(save) {
 
 <style scoped>
 .page {
-  max-width: 1080px;
+  max-width: 1120px;
   margin: 0 auto;
-  padding: 32px 24px 48px;
+  padding: 44px 24px 64px;
+  animation: fadeInUp 0.45s var(--ease-spring) both;
 }
 
 .topbar {
@@ -177,22 +187,35 @@ async function remove(save) {
   align-items: flex-start;
   justify-content: space-between;
   gap: 24px;
-  margin-bottom: 28px;
+  margin-bottom: 32px;
   flex-wrap: wrap;
 }
 
 .brand h1 {
   margin: 0;
-  font-size: 24px;
-  font-weight: 650;
-  letter-spacing: 0.18em;
-  color: var(--text);
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  background: linear-gradient(115deg, #c4b5fd 0%, #f0abfc 46%, #67e8f9 92%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: breathe 5.5s ease-in-out infinite;
+}
+
+html[data-theme="light"] .brand h1 {
+  background: linear-gradient(115deg, #5b21b6 0%, #c026d3 48%, #0e7490 95%);
+  -webkit-background-clip: text;
+  background-clip: text;
 }
 
 .brand-sub {
-  margin: 6px 0 0;
+  margin: 8px 0 0;
   font-size: 12px;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.14em;
+  color: var(--accent);
+  opacity: 0.85;
 }
 
 .topbar-actions {
@@ -222,24 +245,84 @@ async function remove(save) {
 }
 
 .save-card {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
   padding: 18px 18px 16px;
   cursor: pointer;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease,
-    transform 0.18s ease;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  min-height: 132px;
+  min-height: 148px;
+  animation: fadeInUp 0.5s var(--ease-spring) both;
+  transition: border-color var(--ease), box-shadow var(--ease-spring),
+    transform var(--ease-spring);
+}
+
+.save-card:nth-child(1) {
+  animation-delay: 0.02s;
+}
+
+.save-card:nth-child(2) {
+  animation-delay: 0.07s;
+}
+
+.save-card:nth-child(3) {
+  animation-delay: 0.12s;
+}
+
+.save-card:nth-child(4) {
+  animation-delay: 0.17s;
+}
+
+.save-card:nth-child(5) {
+  animation-delay: 0.22s;
+}
+
+.save-card:nth-child(6) {
+  animation-delay: 0.27s;
+}
+
+/* 鼠标聚光：跟随 --mx/--my 变量 */
+.save-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    260px circle at var(--mx, 50%) var(--my, 0%),
+    rgba(167, 139, 250, 0.22),
+    rgba(232, 121, 249, 0.08) 42%,
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity 0.28s ease;
+  pointer-events: none;
+}
+
+.save-top,
+.save-char,
+.save-meta,
+.warn {
+  position: relative;
+  z-index: 1;
+}
+
+.save-card:hover::after {
+  opacity: 1;
 }
 
 .save-card:hover {
   border-color: var(--accent-border);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
-  transform: translateY(-2px);
+  box-shadow: 0 22px 48px -26px rgba(139, 92, 246, 0.75),
+    0 0 0 1px rgba(139, 92, 246, 0.22), var(--shadow-panel);
+  transform: translateY(-4px);
 }
 
 html[data-theme="light"] .save-card:hover {
-  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 18px 40px -24px rgba(109, 40, 217, 0.4),
+    0 0 0 1px rgba(124, 58, 237, 0.2), var(--shadow-panel);
 }
 
 .save-top {
@@ -296,31 +379,49 @@ html[data-theme="light"] .save-card:hover {
 
 .empty {
   grid-column: 1 / -1;
-  padding: 56px 32px;
+  position: relative;
+  overflow: hidden;
+  padding: 72px 32px;
   text-align: center;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
+  animation: fadeInUp 0.5s var(--ease-spring) both;
+}
+
+.empty::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(closest-side, rgba(139, 92, 246, 0.16), transparent) 50% 24% / 60% 70% no-repeat,
+    radial-gradient(closest-side, rgba(232, 121, 249, 0.1), transparent) 78% 84% / 40% 50% no-repeat;
+  pointer-events: none;
 }
 
 .empty-icon {
-  font-size: 28px;
-  color: var(--accent);
-  opacity: 0.7;
-  margin-bottom: 4px;
+  position: relative;
+  font-size: 40px;
+  color: var(--accent-hover);
+  text-shadow: 0 0 28px rgba(167, 139, 250, 0.95), 0 0 60px rgba(232, 121, 249, 0.5);
+  animation: floatY 4.5s ease-in-out infinite;
+  margin-bottom: 8px;
 }
 
 .empty-title {
+  position: relative;
   margin: 0;
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
 }
 
 .empty-desc {
-  margin: 0 0 12px;
-  max-width: 360px;
+  position: relative;
+  margin: 0 0 16px;
+  max-width: 380px;
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.7;
 }
 </style>

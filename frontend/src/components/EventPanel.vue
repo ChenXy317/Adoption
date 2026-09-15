@@ -23,18 +23,28 @@ defineProps({
   padding: 12px 14px;
 }
 
-.panel h3 {
-  margin: 0 0 10px;
-  font-size: 13px;
-  color: var(--text-dim);
-  font-weight: 600;
-  letter-spacing: 0.04em;
+.event {
+  position: relative;
+  margin-bottom: 10px;
+  padding: 2px 0 8px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  transition: transform var(--ease-spring);
 }
 
-.event {
-  margin-bottom: 10px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--border-soft);
+.event:hover {
+  transform: translateX(2px);
+}
+
+.event::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--grad-cool);
+  box-shadow: 0 0 10px 1px rgba(34, 211, 238, 0.8);
 }
 
 .event:last-child {
