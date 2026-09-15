@@ -317,5 +317,822 @@
     "cooldown_minutes": 0,
     "priority": 70,
     "enabled": true
+  },
+  {
+    "key": "date_handhold",
+    "name": "牵手回家的一段路",
+    "category": "relationship",
+    "enter_trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "scene_unlocked:date_handhold",
+          "value": true
+        },
+        {
+          "type": "attr",
+          "key": "affection",
+          "op": ">=",
+          "value": 45
+        }
+      ]
+    },
+    "enter_cost": {},
+    "scene_prompt": "晚上散步回来的路。路灯一盏接一盏，把两个人的影子拉长又缩短。她的手在袖口里进进出出，越来越频繁地碰到你的手背，又像触电一样缩回去。她说今晚的路好像有点长，可脚步放得很慢。",
+    "goal": "让她敢主动牵住你的手，并发现这件事并不可怕。",
+    "min_turns": 4,
+    "max_turns": 12,
+    "exit": {},
+    "effects": {
+      "attrs": {
+        "intimacy": 4,
+        "affection": 3,
+        "trust": 2,
+        "mood": 5
+      },
+      "flags": {
+        "date_handhold_done": true
+      }
+    },
+    "next_scenes": [],
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 66,
+    "enabled": true
+  },
+  {
+    "key": "study_literacy",
+    "name": "教她写名字",
+    "category": "relationship",
+    "enter_trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "scene_unlocked:study_literacy",
+          "value": true
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 45
+        }
+      ]
+    },
+    "enter_cost": {},
+    "scene_prompt": "台灯下摊着那本二手练习簿。她握笔的姿势很用力，一笔一画写得很慢，写歪了就整行划掉重来，橡皮擦的碎屑在纸边堆成一小撮。她想写好自己的名字，也想写好你的。",
+    "goal": "陪她练字，让她在被耐心对待里获得一点「我也可以」的底气。",
+    "min_turns": 3,
+    "max_turns": 12,
+    "exit": {},
+    "effects": {
+      "attrs": {
+        "trust": 4,
+        "affection": 3,
+        "intimacy": 2,
+        "mood": 5
+      },
+      "flags": {
+        "study_literacy_done": true
+      }
+    },
+    "next_scenes": [],
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 64,
+    "enabled": true
+  },
+  {
+    "key": "talk_night_door",
+    "name": "走廊里的那盏灯",
+    "category": "relationship",
+    "enter_trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "scene_unlocked:talk_night_door",
+          "value": true
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 55
+        },
+        {
+          "type": "period",
+          "in": [
+            "night",
+            "late_night"
+          ]
+        }
+      ]
+    },
+    "enter_cost": {},
+    "scene_prompt": "夜里很安静，客厅只留了一盏小灯。她抱着毯子坐在沙发边，为前几天夜里的事道歉，又忍不住解释她只是想确认你「还在」。这个习惯她藏了很久，说出口的时候盯着自己的脚尖。",
+    "goal": "让她说出深夜确认你在的习惯，并确认这件事不会让你觉得奇怪或负担。",
+    "min_turns": 4,
+    "max_turns": 12,
+    "exit": {},
+    "effects": {
+      "attrs": {
+        "trust": 5,
+        "dependence": 3,
+        "intimacy": 3,
+        "vigilance": -5,
+        "mood": 4
+      },
+      "flags": {
+        "talk_night_door_done": true
+      }
+    },
+    "next_scenes": [],
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 74,
+    "enabled": true
+  },
+  {
+    "key": "talk_scar_accept",
+    "name": "旧伤的样子",
+    "category": "relationship",
+    "enter_trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "scene_unlocked:talk_scar_accept",
+          "value": true
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 50
+        }
+      ]
+    },
+    "enter_cost": {},
+    "scene_prompt": "她把袖子卷到手腕，那道浅色的疤在灯下看得很清楚。她愿意讲一点点：「怎么来的」「为什么不给人看」，但更想知道的是——你看见了以后，会不会变得不一样。",
+    "goal": "在她主动露出手腕之后，给出稳定、不猎奇的回应，让她知道这不会改变任何事。",
+    "min_turns": 4,
+    "max_turns": 12,
+    "exit": {},
+    "effects": {
+      "attrs": {
+        "trust": 6,
+        "intimacy": 3,
+        "vigilance": -6,
+        "affection": 3
+      },
+      "flags": {
+        "talk_scar_accept_done": true
+      }
+    },
+    "next_scenes": [],
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 76,
+    "enabled": true
+  },
+  {
+    "key": "care_thunder_night",
+    "name": "雷雨夜的客厅",
+    "category": "relationship",
+    "enter_trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "scene_unlocked:care_thunder_night",
+          "value": true
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 28
+        },
+        {
+          "type": "period",
+          "in": [
+            "night",
+            "late_night"
+          ]
+        }
+      ]
+    },
+    "enter_cost": {},
+    "scene_prompt": "雷声一阵接一阵。她裹着毯子缩在沙发角，明明害怕，却一直说「没事，你回去睡吧」。闪烁的雷光里，她每次都会下意识看你一眼，确认你没有不耐烦。",
+    "goal": "用陪伴把雷雨夜变成不那么可怕的一个晚上，不需要逼她承认害怕。",
+    "min_turns": 4,
+    "max_turns": 12,
+    "exit": {},
+    "effects": {
+      "attrs": {
+        "trust": 4,
+        "dependence": 3,
+        "affection": 3,
+        "mood": 4,
+        "vigilance": -4
+      },
+      "flags": {
+        "care_thunder_night_done": true
+      }
+    },
+    "next_scenes": [],
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 72,
+    "enabled": true
+  },
+  {
+    "key": "care_you_sick",
+    "name": "换她来照顾你",
+    "category": "relationship",
+    "enter_trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "scene_unlocked:care_you_sick",
+          "value": true
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 40
+        }
+      ]
+    },
+    "enter_cost": {},
+    "scene_prompt": "你躺在床上发烧，她第一次成为「照顾的那个人」。她每隔一会儿就来摸一下你的额头，动作轻得像怕碰碎什么；药和水摆在床头，她自己搬了张凳子在门口守着，不肯去睡。",
+    "goal": "让她第一次学习照顾别人，也允许她笨拙——重点是她被需要，而不是她做得好不好。",
+    "min_turns": 4,
+    "max_turns": 12,
+    "exit": {},
+    "effects": {
+      "attrs": {
+        "trust": 4,
+        "dependence": 3,
+        "affection": 4,
+        "intimacy": 2,
+        "mood": 5
+      },
+      "flags": {
+        "care_you_sick_done": true
+      }
+    },
+    "next_scenes": [],
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 78,
+    "enabled": true
+  },
+  {
+    "key": "care_after_lockout",
+    "name": "门锁上以后",
+    "category": "relationship",
+    "enter_trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "scene_unlocked:care_after_lockout",
+          "value": true
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 32
+        }
+      ]
+    },
+    "enter_cost": {},
+    "scene_prompt": "白天钥匙弄丢以后，她一直有点魂不守舍。晚饭后她坐在房间门口，说今天在楼下那半个小时里，脑子里冒出很多乱七八糟的念头——最害怕的那个是「刚好可以不用回来了」。",
+    "goal": "接住「被关在门外」引出的恐惧，重新确认这里是她可以随时回来的地方。",
+    "min_turns": 4,
+    "max_turns": 12,
+    "exit": {},
+    "effects": {
+      "attrs": {
+        "trust": 5,
+        "dependence": 3,
+        "vigilance": -5,
+        "affection": 3,
+        "mood": 4
+      },
+      "flags": {
+        "care_after_lockout_done": true
+      }
+    },
+    "next_scenes": [],
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 73,
+    "enabled": true
+  },
+  {
+    "key": "talk_money_plan",
+    "name": "钱的事，说开了",
+    "category": "relationship",
+    "enter_trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "scene_unlocked:talk_money_plan",
+          "value": true
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 38
+        }
+      ]
+    },
+    "enter_cost": {},
+    "scene_prompt": "桌上的零钱还没有收。她坐得很直，等着你的回答——她想知道自己那点钱能不能真的算进「一起」里，也怕这个问题问得太越界。窗外很安静，适合把家用和以后怎么过，慢慢聊清楚。",
+    "goal": "把「一起过日子」这件事摊开来聊：让她参与决定，而不是只被安排。",
+    "min_turns": 4,
+    "max_turns": 12,
+    "exit": {},
+    "effects": {
+      "attrs": {
+        "trust": 5,
+        "affection": 3,
+        "dependence": 2,
+        "mood": 4
+      },
+      "flags": {
+        "talk_money_plan_done": true
+      }
+    },
+    "next_scenes": [],
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 71,
+    "enabled": true
+  },
+  {
+    "key": "talk_feelings",
+    "name": "学会说难过",
+    "category": "relationship",
+    "enter_trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "scene_unlocked:talk_feelings",
+          "value": true
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 50
+        }
+      ]
+    },
+    "enter_cost": {},
+    "scene_prompt": "晚归的事过去没几天，她还记得自己那句「我有点难过」。她不确定说真话的权利到底有多少，所以今天格外小心地试探：哪些话可以说，说了以后你会不会烦。",
+    "goal": "让她确认「表达难过」不会带来惩罚，练习把感受说完整。",
+    "min_turns": 4,
+    "max_turns": 12,
+    "exit": {},
+    "effects": {
+      "attrs": {
+        "trust": 5,
+        "affection": 4,
+        "intimacy": 3,
+        "vigilance": -4,
+        "mood": 5
+      },
+      "flags": {
+        "talk_feelings_done": true
+      }
+    },
+    "next_scenes": [],
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 75,
+    "enabled": true
+  },
+  {
+    "key": "cook_kitchen_scene",
+    "name": "两个人的晚饭",
+    "category": "relationship",
+    "enter_trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "scene_unlocked:cook_kitchen_scene",
+          "value": true
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 26
+        }
+      ]
+    },
+    "enter_cost": {},
+    "scene_prompt": "厨房里重新热闹起来。她今天主动提了菜谱，坚持要自己挑一道「你上次说好吃的」。灶台上两个锅同时冒着热气，她端着盘子从你身后挤过去，肩膀几乎擦到你的手臂，却没有僵硬。",
+    "goal": "在烟火气里练习并肩做事：她做主一道菜，并且享受这一点点主导权。",
+    "min_turns": 4,
+    "max_turns": 12,
+    "exit": {},
+    "effects": {
+      "attrs": {
+        "intimacy": 3,
+        "affection": 3,
+        "trust": 2,
+        "mood": 6
+      },
+      "flags": {
+        "cook_kitchen_scene_done": true
+      }
+    },
+    "next_scenes": [],
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 62,
+    "enabled": true
+  },
+  {
+    "key": "date_ferris_wheel",
+    "name": "摩天轮的最高处",
+    "category": "story",
+    "enter_trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "scene_unlocked:date_ferris_wheel",
+          "value": true
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 30
+        },
+        {
+          "type": "attr",
+          "key": "affection",
+          "op": ">=",
+          "value": 35
+        }
+      ]
+    },
+    "enter_cost": {},
+    "scene_prompt": "摩天轮的轿厢慢慢升高，城市在脚下铺开。她一半害怕一半想看，坐得笔直，在最高处时终于把一直攥着的话说了出来——虽然小声得差点被风带走。",
+    "goal": "在离地最高的地方，让她说出平时说不出口的话，并发现你不会笑她。",
+    "min_turns": 4,
+    "max_turns": 12,
+    "exit": {},
+    "effects": {
+      "attrs": {
+        "affection": 4,
+        "intimacy": 4,
+        "mood": 7,
+        "trust": 2
+      },
+      "flags": {
+        "date_ferris_wheel_done": true
+      }
+    },
+    "next_scenes": [],
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 64,
+    "enabled": true
+  },
+  {
+    "key": "date_photo_booth",
+    "name": "贴纸相机的下午",
+    "category": "story",
+    "enter_trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "scene_unlocked:date_photo_booth",
+          "value": true
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 24
+        }
+      ]
+    },
+    "enter_cost": {},
+    "scene_prompt": "布帘放下来，世界只剩一米见方。机器提示「请靠近一点」的时候，她僵在原地，手心全是汗。她既想留下点什么，又怕自己看起来太贪心。",
+    "goal": "拍一张属于两个人的照片，让她习惯「被留下记录」这件事。",
+    "min_turns": 4,
+    "max_turns": 12,
+    "exit": {},
+    "effects": {
+      "attrs": {
+        "intimacy": 3,
+        "affection": 3,
+        "mood": 6
+      },
+      "flags": {
+        "date_photo_booth_done": true
+      }
+    },
+    "next_scenes": [],
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 60,
+    "enabled": true
+  },
+  {
+    "key": "date_karaoke",
+    "name": "只唱给你听",
+    "category": "story",
+    "enter_trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "scene_unlocked:date_karaoke",
+          "value": true
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 30
+        },
+        {
+          "type": "attr",
+          "key": "intimacy",
+          "op": ">=",
+          "value": 10
+        }
+      ]
+    },
+    "enter_cost": {},
+    "scene_prompt": "包间很小，灯很暗。屏幕上歌单滚了很久，她终于点了那一首。前奏响起来的时候，她先看门有没有关好，再看你——确认这里只有你们两个人。",
+    "goal": "在安全的小空间里，让她把声音放出来一点点。",
+    "min_turns": 4,
+    "max_turns": 12,
+    "exit": {},
+    "effects": {
+      "attrs": {
+        "intimacy": 4,
+        "mood": 6,
+        "affection": 3
+      },
+      "flags": {
+        "date_karaoke_done": true
+      }
+    },
+    "next_scenes": [],
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 61,
+    "enabled": true
+  },
+  {
+    "key": "festival_fireworks",
+    "name": "烟花大会",
+    "category": "story",
+    "enter_trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "scene_unlocked:festival_fireworks",
+          "value": true
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 35
+        },
+        {
+          "type": "attr",
+          "key": "affection",
+          "op": ">=",
+          "value": 40
+        },
+        {
+          "type": "period",
+          "in": [
+            "evening",
+            "night"
+          ]
+        }
+      ]
+    },
+    "enter_cost": {},
+    "scene_prompt": "河堤上挤满了人，烟花一朵接一朵。她被人群推得半步贴近你，肩膀绷着，却又舍不得错过任何一发。每一声炸响都让她一颤，可她没有闭眼。",
+    "goal": "在热闹里让她安心：害怕的时候不用逞强，抬头的时候有人站在旁边。",
+    "min_turns": 4,
+    "max_turns": 12,
+    "exit": {},
+    "effects": {
+      "attrs": {
+        "affection": 5,
+        "intimacy": 4,
+        "mood": 9,
+        "vigilance": -4
+      },
+      "flags": {
+        "festival_fireworks_done": true
+      }
+    },
+    "next_scenes": [],
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 68,
+    "enabled": true
+  },
+  {
+    "key": "date_train_trip",
+    "name": "小镇一日",
+    "category": "story",
+    "enter_trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "scene_unlocked:date_train_trip",
+          "value": true
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 34
+        }
+      ]
+    },
+    "enter_cost": {},
+    "scene_prompt": "小镇的石板路很窄，店铺的门口挂着旧风铃。她在这里第一次走在你前面半步——因为要看清摊位上的东西，回头招呼你的次数比平时多了一倍。她自己也发现，在没有人认识他们的地方，她好像没那么怕。",
+    "goal": "在陌生的小镇里度过一天，让她体验「不被注视」的自由。",
+    "min_turns": 4,
+    "max_turns": 12,
+    "exit": {},
+    "effects": {
+      "attrs": {
+        "affection": 4,
+        "trust": 3,
+        "mood": 8,
+        "intimacy": 3
+      },
+      "flags": {
+        "date_train_trip_done": true
+      }
+    },
+    "next_scenes": [],
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 66,
+    "enabled": true
+  },
+  {
+    "key": "talk_stars",
+    "name": "人会不会变成星星",
+    "category": "relationship",
+    "enter_trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "scene_unlocked:talk_stars",
+          "value": true
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 36
+        },
+        {
+          "type": "period",
+          "in": [
+            "night",
+            "late_night"
+          ]
+        }
+      ]
+    },
+    "enter_cost": {},
+    "scene_prompt": "天台的夜风不冷。她仰着头，问了一个很轻的问题：「人走了以后，会不会也变成一颗？」她不是在问星星，只是在试探——有些怕的东西，是不是也可以拿出来说。",
+    "goal": "在她主动触碰「失去」这个话题时，陪她把话说完整，不急着安慰。",
+    "min_turns": 4,
+    "max_turns": 12,
+    "exit": {},
+    "effects": {
+      "attrs": {
+        "trust": 4,
+        "intimacy": 3,
+        "mood": 5,
+        "dependence": 2
+      },
+      "flags": {
+        "talk_stars_done": true
+      }
+    },
+    "next_scenes": [],
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 67,
+    "enabled": true
+  },
+  {
+    "key": "festival_her_birthday",
+    "name": "第一个被她选中的生日",
+    "category": "story",
+    "enter_trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "scene_unlocked:festival_her_birthday",
+          "value": true
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 40
+        },
+        {
+          "type": "game_day",
+          "op": ">=",
+          "value": 15
+        }
+      ]
+    },
+    "enter_cost": {},
+    "scene_prompt": "她把今天定成了自己的生日。家里没有蛋糕蜡烛的先例，她也不许你太麻烦——可你一进门就看出来，她把桌子擦了两遍，头发也梳得格外整齐。她在等一个「今天不一样」的证据。",
+    "goal": "完成她人生里第一个被记得的生日：郑重，但别让她觉得欠了什么。",
+    "min_turns": 4,
+    "max_turns": 12,
+    "exit": {},
+    "effects": {
+      "attrs": {
+        "affection": 6,
+        "trust": 4,
+        "intimacy": 3,
+        "mood": 10
+      },
+      "flags": {
+        "festival_her_birthday_done": true
+      }
+    },
+    "next_scenes": [],
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 70,
+    "enabled": true
+  },
+  {
+    "key": "talk_future",
+    "name": "以后的日子",
+    "category": "relationship",
+    "enter_trigger": {
+      "all": [
+        {
+          "type": "flag",
+          "key": "scene_unlocked:talk_future",
+          "value": true
+        },
+        {
+          "type": "attr",
+          "key": "trust",
+          "op": ">=",
+          "value": 60
+        },
+        {
+          "type": "attr",
+          "key": "affection",
+          "op": ">=",
+          "value": 60
+        }
+      ]
+    },
+    "enter_cost": {},
+    "scene_prompt": "晚上没有电视声，只有楼下偶尔的车经过。她抱着膝盖问出那个一直想问的问题：以后会怎么样。她说自己不怕答案，只是想知道该往哪个方向努力。",
+    "goal": "把「以后」具体地聊一次：她想知道的不只是会不会留下，而是留下来要成为怎样的人。",
+    "min_turns": 4,
+    "max_turns": 12,
+    "exit": {},
+    "effects": {
+      "attrs": {
+        "trust": 5,
+        "affection": 5,
+        "intimacy": 3,
+        "dependence": 2,
+        "mood": 7
+      },
+      "flags": {
+        "talk_future_done": true
+      }
+    },
+    "next_scenes": [],
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 76,
+    "enabled": true
   }
 ]
