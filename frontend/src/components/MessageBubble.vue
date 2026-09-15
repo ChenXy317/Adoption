@@ -33,7 +33,7 @@ function formatDelta(value) {
 .bubble {
   max-width: 82%;
   padding: 12px 16px;
-  border-radius: 14px;
+  border-radius: 12px;
   position: relative;
   white-space: pre-wrap;
   word-break: break-word;
@@ -46,6 +46,7 @@ function formatDelta(value) {
   background: var(--accent-soft);
   border: 1px solid var(--accent-border);
   border-bottom-right-radius: 6px;
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.12);
 }
 
 .bubble.assistant {

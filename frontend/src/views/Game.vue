@@ -22,38 +22,64 @@
         <ChatInput :save-id="$route.params.id" />
       </main>
 
-      <aside class="side">
-        <section class="card panel">
-          <h3>状态</h3>
-          <div class="dim meta" v-if="characterLine">{{ characterLine }}</div>
-          <div class="phase" v-if="game.current?.phase">
-            关系阶段：{{ game.current.phase }}
-            <template v-if="game.current?.tendency"> · {{ game.current.tendency }}</template>
-          </div>
-          <div class="mood" v-if="game.current?.mood_label">
-            此刻心情：{{ game.current.mood_label }}
-          </div>
-          <StatusBars :attributes="game.current?.attributes || []" />
-        </section>
+      <div class="side-shell" :class="{ 'drawer-open': !!openDir }">
+        <SideDrawer
+          :open="!!openDir"
+          :title="drawerTitle"
+          :overlay="useOverlay"
+          @close="openDir = null"
+        >
+          <!-- 状态 -->
+          <section v-show="openDir === 'status'" class="status-block">
+            <div class="dim meta" v-if="characterLine">{{ characterLine }}</div>
+            <div class="phase" v-if="game.current?.phase">
+              关系阶段：{{ game.current.phase }}
+              <template v-if="game.current?.tendency"> · {{ game.current.tendency }}</template>
+            </div>
+            <div class="mood" v-if="game.current?.mood_label">
+              此刻心情：{{ game.current.mood_label }}
+            </div>
+            <StatusBars :attributes="game.current?.attributes || []" />
+          </section>
 
-        <WalletPanel :save-id="$route.params.id" @triggered="onSettled" />
+          <WalletPanel
+            v-show="openDir === 'wallet'"
+            :save-id="$route.params.id"
+            @triggered="onSettled"
+          />
 
-        <AdvancePanel :save-id="$route.params.id" @advanced="onSettled" />
+          <AdvancePanel
+            v-show="openDir === 'advance'"
+            :save-id="$route.params.id"
+            @advanced="onSettled"
+          />
 
-        <ActionPanel
-          :save-id="$route.params.id"
-          :items="game.current?.manual_events || []"
-          @triggered="onSettled"
+          <ActionPanel
+            v-show="openDir === 'actions'"
+            :save-id="$route.params.id"
+            :items="game.current?.manual_events || []"
+            @triggered="onSettled"
+          />
+
+          <EventPanel
+            v-show="openDir === 'events'"
+            :events="game.current?.recent_events || []"
+          />
+
+          <SceneBanner
+            v-show="openDir === 'scene'"
+            :save-id="$route.params.id"
+            :scene="game.current?.active_scene"
+            @ended="onSettled"
+          />
+        </SideDrawer>
+
+        <SideNav
+          :items="navItems"
+          :active="openDir"
+          @select="toggleDir"
         />
-
-        <EventPanel :events="game.current?.recent_events || []" />
-
-        <SceneBanner
-          :save-id="$route.params.id"
-          :scene="game.current?.active_scene"
-          @ended="onSettled"
-        />
-      </aside>
+      </div>
     </div>
 
     <ModelCatalogModal v-if="catalogOpen" @close="onCatalogClose" />
@@ -64,7 +90,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
 import ActionPanel from "../components/ActionPanel.vue";
@@ -76,6 +102,8 @@ import EventPanel from "../components/EventPanel.vue";
 import MemoryPanel from "../components/MemoryPanel.vue";
 import ModelCatalogModal from "../components/ModelCatalogModal.vue";
 import SceneBanner from "../components/SceneBanner.vue";
+import SideDrawer from "../components/SideDrawer.vue";
+import SideNav from "../components/SideNav.vue";
 import StatusBars from "../components/StatusBars.vue";
 import ThemeModal from "../components/ThemeModal.vue";
 import WalletPanel from "../components/WalletPanel.vue";
@@ -96,11 +124,56 @@ const memoryOpen = ref(false);
 const defsOpen = ref(false);
 const themeOpen = ref(false);
 
+/** currently open direction id, or null */
+const openDir = ref(null);
+const useOverlay = ref(false);
+
+const DIR_META = {
+  status: "状态",
+  wallet: "钱包",
+  advance: "推进",
+  actions: "行动",
+  events: "事件",
+  scene: "场景",
+};
+
+const hasScene = computed(() => !!game.current?.active_scene);
+
+const navItems = computed(() => {
+  const items = [
+    { id: "status", label: DIR_META.status },
+    { id: "wallet", label: DIR_META.wallet },
+    { id: "advance", label: DIR_META.advance },
+    { id: "actions", label: DIR_META.actions },
+    { id: "events", label: DIR_META.events },
+  ];
+  if (hasScene.value) {
+    items.push({ id: "scene", label: DIR_META.scene });
+  }
+  return items;
+});
+
+const drawerTitle = computed(() => (openDir.value ? DIR_META[openDir.value] || "" : ""));
+
 const characterLine = computed(() => {
   const c = game.current?.character;
   if (!c) return "";
   return `${c.name} · ${c.age} 岁${c.relation ? ` · ${c.relation}` : ""}`;
 });
+
+function toggleDir(id) {
+  openDir.value = openDir.value === id ? null : id;
+}
+
+function syncOverlay() {
+  useOverlay.value = window.matchMedia("(max-width: 960px)").matches;
+}
+
+function onKeydown(e) {
+  if (e.key === "Escape" && openDir.value) {
+    openDir.value = null;
+  }
+}
 
 async function load(saveId) {
   try {
@@ -113,6 +186,18 @@ async function load(saveId) {
 
 onMounted(() => {
   load(props.id);
+  syncOverlay();
+  window.addEventListener("resize", syncOverlay);
+  window.addEventListener("keydown", onKeydown);
+});
+
+onBeforeUnmount(() => {
+  chat.cancel();
+});
+
+onUnmounted(() => {
+  window.removeEventListener("resize", syncOverlay);
+  window.removeEventListener("keydown", onKeydown);
 });
 
 watch(
@@ -121,12 +206,15 @@ watch(
     if (id == null) return;
     chat.cancel();
     game.current = null;
+    openDir.value = null;
     load(id);
   }
 );
 
-onBeforeUnmount(() => {
-  chat.cancel();
+watch(hasScene, (ok) => {
+  if (!ok && openDir.value === "scene") {
+    openDir.value = null;
+  }
 });
 
 async function refresh() {
@@ -211,12 +299,13 @@ async function onCatalogClose() {
 .body {
   flex: 1;
   display: flex;
-  gap: 16px;
+  gap: 12px;
   padding: 16px 20px;
   min-height: 0;
-  max-width: 1320px;
+  max-width: 1400px;
   width: 100%;
   margin: 0 auto;
+  position: relative;
 }
 
 .chat {
@@ -228,26 +317,20 @@ async function onCatalogClose() {
   overflow: hidden;
 }
 
-.side {
-  width: 292px;
+.side-shell {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 8px;
   flex-shrink: 0;
+  min-height: 0;
+  position: relative;
+}
+
+.status-block {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  overflow-y: auto;
-  padding-bottom: 8px;
-}
-
-.panel {
-  padding: 12px 14px;
-}
-
-.panel h3 {
-  margin: 0 0 10px;
-  font-size: 13px;
-  color: var(--text-dim);
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  gap: 2px;
 }
 
 .meta {

@@ -62,16 +62,16 @@ function round(v) {
 
 .bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent), #d4a8b8);
+  background: linear-gradient(90deg, var(--accent), #6366f1);
   border-radius: 3px;
   transition: width 0.35s ease;
 }
 
 .bar-fill.low {
-  background: linear-gradient(90deg, var(--danger), #d4a0a0);
+  background: linear-gradient(90deg, var(--danger), #fca5a5);
 }
 
 html[data-theme="light"] .bar-fill {
-  background: linear-gradient(90deg, var(--accent), #c990a4);
+  background: linear-gradient(90deg, var(--accent), #6366f1);
 }
 </style>

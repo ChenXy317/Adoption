@@ -33,12 +33,12 @@ const THEMES = [
   {
     key: "dark",
     label: "暗色（默认）",
-    swatch: "linear-gradient(135deg, #121015, #c48b9f)",
+    swatch: "linear-gradient(135deg, #05080f, #8b5cf6)",
   },
   {
     key: "light",
     label: "亮色",
-    swatch: "linear-gradient(135deg, #f7f4f1, #a86b7e)",
+    swatch: "linear-gradient(135deg, #f8fafc, #8b5cf6)",
   },
 ];
 </script>

@@ -239,7 +239,7 @@ async function remove(save) {
 }
 
 html[data-theme="light"] .save-card:hover {
-  box-shadow: 0 4px 18px rgba(40, 30, 28, 0.08);
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.08);
 }
 
 .save-top {
