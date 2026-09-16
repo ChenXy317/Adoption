@@ -105,6 +105,7 @@ textarea:focus {
 
   textarea {
     min-height: 44px;
+    max-height: 32vh;
     max-height: 32dvh;
     padding: 10px;
     line-height: 1.5;

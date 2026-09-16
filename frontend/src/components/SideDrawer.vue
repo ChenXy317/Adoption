@@ -199,6 +199,7 @@ defineEmits(["close"]);
     bottom: calc(84px + env(safe-area-inset-bottom, 0px));
     width: auto;
     max-width: none;
+    max-height: 62vh;
     max-height: 62dvh;
     transform: translateY(12px);
     border-radius: var(--radius-sm);

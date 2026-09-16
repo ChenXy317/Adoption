@@ -408,6 +408,7 @@ html[data-theme="light"] .chat {
 /* ── 移动端（≤768px）：顶栏压缩横滑 + 纵向布局 + 底部功能条 ── */
 @media (max-width: 768px) {
   .game {
+    height: 100vh;
     height: 100dvh;
   }
 

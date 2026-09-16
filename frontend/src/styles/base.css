@@ -624,22 +624,16 @@ html[data-theme="light"] .modal-mask {
 html,
 body,
 #app {
+  height: 100%;
+  height: 100vh;
   height: 100dvh;
 }
 
-body {
+  body {
   /* iOS 橡皮筋滚动时不露白 */
   overscroll-behavior-y: none;
   /* 防止双击缩放误触，保证触控响应 */
   touch-action: manipulation;
-}
-
-@supports not (height: 100dvh) {
-  html,
-  body,
-  #app {
-    height: 100%;
-  }
 }
 
 @media (max-width: 768px) {
@@ -673,17 +667,28 @@ body {
     flex-wrap: wrap;
   }
 
-  /* 弹窗：贴底全宽、圆角只留顶部，适配单手操作 */
+  /* 弹窗：贴底全宽、圆角只留顶部，适配单手操作。
+     注意：移动端 fixed 遮罩底部可能超出可视区（动态工具栏），
+     因此弹窗自身 fixed 贴底，不依赖遮罩的 flex-end 对齐。 */
   .modal-mask {
     align-items: flex-end;
     padding: 0;
   }
 
   .modal {
-    width: 100vw;
-    max-width: 100vw;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    max-width: none;
+    max-height: 92vh;
     max-height: 92dvh;
+    margin: 0;
     border-radius: 16px 16px 0 0;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
     padding: 16px 14px calc(14px + env(safe-area-inset-bottom, 0px));
   }
 

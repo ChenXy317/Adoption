@@ -544,10 +544,12 @@ onMounted(async () => {
     border-bottom: 1px solid var(--border);
     padding-right: 0;
     padding-bottom: 10px;
+    max-height: 28vh;
     max-height: 28dvh;
   }
 
   .def-detail {
+    max-height: 52vh;
     max-height: 52dvh;
     padding-right: 0;
   }

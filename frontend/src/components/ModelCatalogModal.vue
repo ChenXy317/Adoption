@@ -167,7 +167,7 @@
             </div>
           </template>
 
-          <div v-else class="dim">选择左侧供应商进行编辑，或新建一个。</div>
+          <div v-else class="dim">选择供应商进行编辑，或新建一个。</div>
         </section>
       </div>
     </div>
@@ -491,6 +491,7 @@ async function test(m) {
     border-bottom: 1px solid var(--border);
     padding-right: 0;
     padding-bottom: 10px;
+    max-height: 26vh;
     max-height: 26dvh;
     overflow-y: auto;
   }
