@@ -477,4 +477,31 @@ async function test(m) {
 .warn {
   color: var(--warn);
 }
+
+/* ── 移动端：左右分栏改为上下堆叠 ── */
+@media (max-width: 768px) {
+  .catalog-body {
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .providers {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding-right: 0;
+    padding-bottom: 10px;
+    max-height: 26dvh;
+    overflow-y: auto;
+  }
+
+  .model-row .row {
+    flex-basis: 100%;
+  }
+
+  .model-row input {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+}
 </style>

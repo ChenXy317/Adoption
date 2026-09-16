@@ -92,4 +92,30 @@ textarea:focus {
   height: 40px;
   padding: 0 18px;
 }
+
+/* ── 移动端：输入区粘底 + 安全区 + 大按钮 ── */
+@media (max-width: 768px) {
+  .input-area {
+    position: sticky;
+    bottom: 0;
+    gap: 8px;
+    padding: 10px 10px calc(10px + env(safe-area-inset-bottom, 0px));
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  }
+
+  textarea {
+    min-height: 44px;
+    max-height: 32dvh;
+    padding: 10px;
+    line-height: 1.5;
+  }
+
+  .input-area .btn {
+    min-width: 64px;
+    min-height: 44px;
+    height: 44px;
+    padding: 0 14px;
+    flex-shrink: 0;
+  }
+}
 </style>

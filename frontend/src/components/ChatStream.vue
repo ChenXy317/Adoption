@@ -123,4 +123,31 @@ async function loadEarlier() {
 .small {
   font-size: 12px;
 }
+
+/* ── 移动端：减小留白，消息更紧凑 ── */
+@media (max-width: 768px) {
+  .stream {
+    gap: 12px;
+    padding: 14px 12px;
+    /* 顶部渐隐区收窄，首屏多显示一行 */
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 12px,
+      #000 calc(100% - 4px),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 12px,
+      #000 calc(100% - 4px),
+      transparent 100%
+    );
+  }
+
+  .empty {
+    margin-top: 40px;
+  }
+}
 </style>

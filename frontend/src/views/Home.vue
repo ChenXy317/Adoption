@@ -424,4 +424,53 @@ html[data-theme="light"] .save-card:hover {
   font-size: 13px;
   line-height: 1.7;
 }
+
+/* ── 移动端：单列 + 操作常显（无 hover） + 安全区 ── */
+@media (max-width: 768px) {
+  .page {
+    padding: calc(20px + env(safe-area-inset-top, 0px)) 14px
+      calc(28px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .topbar {
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+
+  .brand h1 {
+    font-size: 26px;
+  }
+
+  .topbar-actions {
+    width: 100%;
+  }
+
+  .topbar-actions .btn.primary {
+    flex: 1;
+    min-height: 44px;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .save-card {
+    min-height: 0;
+  }
+
+  /* 触屏无 hover，操作按钮默认可见 */
+  .save-ops {
+    opacity: 1;
+  }
+
+  .save-ops .btn {
+    min-height: 40px;
+    padding: 8px 14px;
+  }
+
+  .empty {
+    padding: 48px 20px;
+  }
+}
 </style>

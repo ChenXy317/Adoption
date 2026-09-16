@@ -91,4 +91,22 @@ const ui = useUiStore();
 .toast.ok::after {
   background: linear-gradient(90deg, #10b981, #34d399);
 }
+
+/* ── 移动端：顶部居中全宽，避开刘海 ── */
+@media (max-width: 768px) {
+  .toast-host {
+    top: calc(10px + env(safe-area-inset-top, 0px));
+    left: 12px;
+    right: 12px;
+  }
+
+  .toast {
+    max-width: none;
+    width: 100%;
+  }
+
+  .toast:hover {
+    transform: none;
+  }
+}
 </style>

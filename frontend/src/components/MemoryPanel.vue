@@ -256,4 +256,32 @@ onMounted(load);
 .small {
   font-size: 12px;
 }
+
+/* ── 移动端：创建行与操作行换行堆叠 ── */
+@media (max-width: 768px) {
+  .create .row,
+  .memory-item .row {
+    flex-wrap: wrap;
+  }
+
+  .create input[style*="flex: 1"],
+  .create input {
+    flex: 1 1 100%;
+  }
+
+  .create .btn.primary {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .actions select,
+  .actions input {
+    flex: 1 1 40%;
+    min-width: 0;
+  }
+
+  .actions .btn {
+    flex: 1 1 40%;
+  }
+}
 </style>

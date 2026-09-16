@@ -404,4 +404,73 @@ html[data-theme="light"] .chat {
 .phase:last-of-type {
   margin-bottom: 8px;
 }
+
+/* ── 移动端（≤768px）：顶栏压缩横滑 + 纵向布局 + 底部功能条 ── */
+@media (max-width: 768px) {
+  .game {
+    height: 100dvh;
+  }
+
+  .topbar {
+    gap: 8px;
+    padding: 8px 10px;
+    padding-top: calc(8px + env(safe-area-inset-top, 0px));
+  }
+
+  .topbar-left {
+    gap: 8px;
+    flex: 1;
+  }
+
+  .save-title {
+    font-size: 13px;
+    max-width: 34vw;
+  }
+
+  .time {
+    font-size: 11px;
+  }
+
+  /* 右侧操作横向滑动，不挤占纵向空间 */
+  .topbar-right {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    gap: 6px;
+    max-width: 52vw;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .topbar-right::-webkit-scrollbar {
+    display: none;
+  }
+
+  .topbar-right .btn {
+    flex-shrink: 0;
+    min-height: 36px;
+    padding: 6px 10px;
+  }
+
+  .body {
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .chat {
+    flex: 1;
+    min-height: 0;
+    border-radius: var(--radius-sm);
+  }
+
+  /* 功能条沉底：抽屉在上、导航在下 */
+  .side-shell {
+    order: 2;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+}
 </style>

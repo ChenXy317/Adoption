@@ -173,4 +173,28 @@ html[data-theme="light"] .msg.user .bubble {
   letter-spacing: 0.03em;
   text-shadow: 0 0 14px rgba(251, 191, 36, 0.35);
 }
+
+/* ── 移动端：气泡更宽、头像缩小 ── */
+@media (max-width: 768px) {
+  .msg {
+    gap: 8px;
+  }
+
+  .avatar {
+    width: 30px;
+    height: 30px;
+    font-size: 12px;
+  }
+
+  .bubble {
+    max-width: 86%;
+    padding: 10px 12px;
+    font-size: 15px;
+  }
+
+  .msg.system .bubble,
+  .msg.event .bubble {
+    max-width: 94%;
+  }
+}
 </style>

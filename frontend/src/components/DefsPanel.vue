@@ -520,4 +520,36 @@ onMounted(async () => {
 .small {
   font-size: 12px;
 }
+
+/* ── 移动端：左右分栏改为上下堆叠 ── */
+@media (max-width: 768px) {
+  .tabs {
+    flex-wrap: wrap;
+  }
+
+  .debug-save {
+    margin-left: 0;
+    max-width: none;
+    flex: 1 1 100%;
+  }
+
+  .defs-body {
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .def-list {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding-right: 0;
+    padding-bottom: 10px;
+    max-height: 28dvh;
+  }
+
+  .def-detail {
+    max-height: 52dvh;
+    padding-right: 0;
+  }
+}
 </style>

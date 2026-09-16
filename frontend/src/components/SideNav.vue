@@ -112,4 +112,48 @@ defineEmits(["select"]);
   line-height: 1.2;
   user-select: none;
 }
+
+/* ── 移动端：转为底部横向导航，方便拇指操作 ── */
+@media (max-width: 768px) {
+  .side-nav {
+    flex-direction: row;
+    align-items: stretch;
+    width: 100%;
+    padding: 6px;
+    padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+    gap: 4px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+
+  .side-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav-item {
+    flex: 1 0 auto;
+    min-width: 56px;
+    min-height: 52px;
+    padding: 6px 8px;
+    gap: 4px;
+  }
+
+  /* 激活指示由左侧光条改为顶部光条 */
+  .nav-item.active::before {
+    left: 20%;
+    right: 20%;
+    top: -6px;
+    bottom: auto;
+    width: auto;
+    height: 3px;
+  }
+
+  .nav-label {
+    writing-mode: horizontal-tb;
+    letter-spacing: 0.08em;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+}
 </style>

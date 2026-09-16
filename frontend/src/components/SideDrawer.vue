@@ -184,4 +184,47 @@ defineEmits(["close"]);
 .drawer-body :deep(section.card h3) {
   display: none; /* avoid double title with drawer chrome */
 }
+
+/* ── 移动端：抽屉改为底部弹窗，盖在底部导航之上 ── */
+@media (max-width: 768px) {
+  .side-drawer.open {
+    width: 100%;
+    max-width: none;
+  }
+  .side-drawer.overlay {
+    position: fixed;
+    top: auto;
+    left: 8px;
+    right: 8px;
+    bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+    width: auto;
+    max-width: none;
+    max-height: 62dvh;
+    transform: translateY(12px);
+    border-radius: var(--radius-sm);
+  }
+
+  .side-drawer.overlay.open {
+    transform: translateY(0);
+  }
+
+  .side-drawer::after {
+    display: none;
+  }
+
+  .drawer-body {
+    padding: 10px 10px calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* 抽屉内的横向行允许换行，避免小屏溢出 */
+  .drawer-body :deep(.row) {
+    flex-wrap: wrap;
+  }
+
+  .close-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 20px;
+  }
+}
 </style>
