@@ -54,6 +54,10 @@
 
   --ease: 0.18s ease;
   --ease-spring: 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* 真实可见高度；JS 会覆盖为 visualViewport 像素值 */
+  --vvh: 100dvh;
+  --vv-top: 0px;
 }
 
 html[data-theme="light"] {
@@ -548,7 +552,7 @@ html[data-theme="light"] .modal-mask {
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: none;
   }
 }
 
@@ -667,29 +671,45 @@ body,
     flex-wrap: wrap;
   }
 
-  /* 弹窗：贴底全宽、圆角只留顶部，适配单手操作。
-     注意：移动端 fixed 遮罩底部可能超出可视区（动态工具栏），
-     因此弹窗自身 fixed 贴底，不依赖遮罩的 flex-end 对齐。 */
+  /* 弹窗遮罩按 visualViewport 高度铺满可见区，避免 100vh 算进浏览器工具栏。
+     弹窗保持在文档流内（不用 fixed）：遮罩上的 backdrop-filter 会让 fixed 子元素
+     以遮罩为包含块，贴底会落到工具栏后面，底下空一截、内容被裁切。 */
   .modal-mask {
-    align-items: flex-end;
+    inset: auto;
+    top: var(--vv-top, 0px);
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: var(--vvh, 100svh);
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-end;
     padding: 0;
+    overflow: hidden;
   }
 
   .modal {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    width: auto;
+    position: relative;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    width: 100%;
     max-width: none;
-    max-height: 92vh;
-    max-height: 92dvh;
-    margin: 0;
+    flex: 0 1 auto;
+    min-height: 0;
+    max-height: calc(100% - 10px);
+    margin: 10px 0 0;
     border-radius: 16px 16px 0 0;
     border-left: none;
     border-right: none;
     border-bottom: none;
-    padding: 16px 14px calc(14px + env(safe-area-inset-bottom, 0px));
+    padding: 16px 14px calc(16px + env(safe-area-inset-bottom, 0px));
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
 
   /* 移动端弱化高斯模糊与大面积动画，省电并防卡顿 */

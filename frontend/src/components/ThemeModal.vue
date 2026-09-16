@@ -1,4 +1,5 @@
 <template>
+  <Teleport to="body">
   <div class="modal-mask" @click.self="$emit('close')">
     <div class="modal theme-modal">
       <div class="row header">
@@ -20,6 +21,7 @@
       </div>
     </div>
   </div>
+  </Teleport>
 </template>
 
 <script setup>
@@ -113,5 +115,12 @@ const THEMES = [
 .small {
   font-size: 12px;
   margin-left: auto;
+}
+
+@media (max-width: 768px) {
+  .theme-modal {
+    width: 100%;
+    max-width: none;
+  }
 }
 </style>

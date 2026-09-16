@@ -357,4 +357,29 @@ onMounted(async () => {
 .narrow {
   width: 90px;
 }
+
+@media (max-width: 768px) {
+  .character-editor {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .editor-head {
+    align-items: flex-start;
+  }
+
+  .editor-head .row {
+    width: 100%;
+  }
+
+  .editor-head .btn {
+    flex: 1;
+  }
+
+  .narrow {
+    width: 100%;
+  }
+}
 </style>

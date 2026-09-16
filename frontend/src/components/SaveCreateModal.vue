@@ -1,4 +1,5 @@
 <template>
+  <Teleport to="body">
   <div class="modal-mask" @click.self="$emit('close')">
     <div class="modal">
       <h2>新建存档（新周目）</h2>
@@ -28,6 +29,7 @@
       </div>
     </div>
   </div>
+  </Teleport>
 </template>
 
 <script setup>

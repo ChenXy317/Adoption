@@ -1,4 +1,5 @@
 <template>
+  <Teleport to="body">
   <div class="modal-mask" @click.self="$emit('close')">
     <div class="modal defs-modal">
       <div class="row" style="justify-content: space-between">
@@ -148,6 +149,7 @@
       </div>
     </div>
   </div>
+  </Teleport>
 </template>
 
 <script setup>
@@ -521,10 +523,17 @@ onMounted(async () => {
   font-size: 12px;
 }
 
-/* ── 移动端：左右分栏改为上下堆叠 ── */
+/* ── 移动端：全宽铺满可见区，内部随弹窗一起滚动 ── */
 @media (max-width: 768px) {
+  .defs-modal {
+    width: 100%;
+    max-width: none;
+    overflow: hidden;
+  }
+
   .tabs {
     flex-wrap: wrap;
+    flex-shrink: 0;
   }
 
   .debug-save {
@@ -534,8 +543,10 @@ onMounted(async () => {
   }
 
   .defs-body {
+    flex: 1;
     flex-direction: column;
     min-height: 0;
+    overflow: hidden;
   }
 
   .def-list {
@@ -544,13 +555,16 @@ onMounted(async () => {
     border-bottom: 1px solid var(--border);
     padding-right: 0;
     padding-bottom: 10px;
-    max-height: 28vh;
-    max-height: 28dvh;
+    max-height: 38%;
+    overflow-y: auto;
+    flex: 0 1 auto;
   }
 
   .def-detail {
-    max-height: 52vh;
-    max-height: 52dvh;
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
     padding-right: 0;
   }
 }

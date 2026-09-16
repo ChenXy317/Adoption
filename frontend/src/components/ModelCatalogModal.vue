@@ -1,4 +1,5 @@
 <template>
+  <Teleport to="body">
   <div class="modal-mask" @click.self="$emit('close')">
     <div class="modal catalog-modal">
       <div class="row" style="justify-content: space-between">
@@ -172,6 +173,7 @@
       </div>
     </div>
   </div>
+  </Teleport>
 </template>
 
 <script setup>
@@ -478,11 +480,20 @@ async function test(m) {
   color: var(--warn);
 }
 
-/* ── 移动端：左右分栏改为上下堆叠 ── */
+/* ── 移动端：全宽铺满可见区，表单随弹窗一起滚动 ── */
 @media (max-width: 768px) {
+  .catalog-modal {
+    width: 100%;
+    max-width: none;
+    overflow: hidden;
+  }
+
   .catalog-body {
+    flex: 1;
     flex-direction: column;
     min-height: 0;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .providers {
@@ -491,9 +502,7 @@ async function test(m) {
     border-bottom: 1px solid var(--border);
     padding-right: 0;
     padding-bottom: 10px;
-    max-height: 26vh;
-    max-height: 26dvh;
-    overflow-y: auto;
+    max-height: none;
   }
 
   .model-row .row {

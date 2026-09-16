@@ -443,10 +443,17 @@ html[data-theme="light"] .save-card:hover {
 
   .topbar-actions {
     width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .actions-secondary {
+    width: 100%;
   }
 
   .topbar-actions .btn.primary {
-    flex: 1;
+    width: 100%;
+    flex: none;
     min-height: 44px;
   }
 

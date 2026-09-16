@@ -1,4 +1,5 @@
 <template>
+  <Teleport to="body">
   <div class="modal-mask" @click.self="$emit('close')">
     <div class="modal memory-modal">
       <div class="row" style="justify-content: space-between">
@@ -83,6 +84,7 @@
       </div>
     </div>
   </div>
+  </Teleport>
 </template>
 
 <script setup>
@@ -257,8 +259,13 @@ onMounted(load);
   font-size: 12px;
 }
 
-/* ── 移动端：创建行与操作行换行堆叠 ── */
+/* ── 移动端：全宽铺满可见区，创建行与操作行换行堆叠 ── */
 @media (max-width: 768px) {
+  .memory-modal {
+    width: 100%;
+    max-width: none;
+  }
+
   .create .row,
   .memory-item .row {
     flex-wrap: wrap;
