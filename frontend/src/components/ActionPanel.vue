@@ -9,7 +9,7 @@
       </div>
       <button
         class="btn small"
-        :disabled="busyKey === item.key || !item.available"
+        :disabled="busyKey === item.key || !item.available || chat.streaming"
         @click="run(item)"
       >
         {{ item.available ? "进行" : reasonText(item.reason) }}
@@ -21,6 +21,7 @@
 <script setup>
 import { ref } from "vue";
 
+import { useChatStore } from "../stores/chat";
 import { useGameStore } from "../stores/game";
 import { useUiStore } from "../stores/ui";
 import { costText, reasonText } from "../utils/actions";
@@ -32,11 +33,12 @@ const props = defineProps({
 const emit = defineEmits(["triggered"]);
 
 const game = useGameStore();
+const chat = useChatStore();
 const ui = useUiStore();
 const busyKey = ref("");
 
 async function run(item) {
-  if (busyKey.value) return;
+  if (busyKey.value || chat.streaming) return;
   busyKey.value = item.key;
   try {
     const data = await game.triggerManual(props.saveId, item.key);

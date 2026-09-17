@@ -96,13 +96,13 @@ def scene_availability(
 def should_finish(
     scene: SceneDef, turns_after: int, *, ai_end: bool, exit_met: bool
 ) -> str | None:
-    """结束判定：AI 主动收尾（min_turns 内拒绝）→ exit 条件 → 超过 max_turns 强收。"""
+    """结束判定：AI 主动收尾（min_turns 内拒绝）→ exit 条件 → 达到 max_turns 强收。"""
     if ai_end and turns_after >= max(0, int(scene.min_turns or 0)):
         return "ai"
     if exit_met:
         return "exit"
     max_turns = max(0, int(scene.max_turns or 0))
-    if max_turns > 0 and turns_after > max_turns:
+    if max_turns > 0 and turns_after >= max_turns:
         return "max_turns"
     return None
 
@@ -125,7 +125,7 @@ def scene_block(active: dict) -> str:
         f"进度：本幕已进行 {turns} 轮，这是第 {turns + 1} 轮"
         + (f"（预计 {max_turns} 轮内收尾）" if max_turns > 0 else "")
     )
-    if max_turns > 0 and turns >= max_turns:
+    if max_turns > 0 and turns + 1 >= max_turns:
         lines.append(
             "请在本条回复中自然地把这一幕收尾：完成目标或做出交代，"
             '并在状态标签的 scene 中输出 {"action":"end","summary":"一句话总结本幕"}。'
@@ -591,9 +591,10 @@ def settle_scenes(
             active = {**active, "turns": turns_after}
             set_active(session, save.id, active)
     if active is None and ended is None and not skip_enter:
-        entered = try_enter(
-            session, save, defs_map, values, source=source, forced_key=forced_key
-        )
-        if entered:
-            active = get_active(session, save.id)
+        if source == "chat" or forced_key:
+            entered = try_enter(
+                session, save, defs_map, values, source=source, forced_key=forced_key
+            )
+            if entered:
+                active = get_active(session, save.id)
     return {"entered": entered, "ended": ended, "active": active}

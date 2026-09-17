@@ -196,7 +196,7 @@ defineEmits(["close"]);
     top: auto;
     left: 8px;
     right: 8px;
-    bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(64px + env(safe-area-inset-bottom, 0px));
     width: auto;
     max-width: none;
     max-height: 62vh;

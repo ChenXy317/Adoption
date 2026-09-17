@@ -20,6 +20,8 @@ desktop.ini
 
 # 日志与临时文件
 *.log
+*.log.*
+server.log*
 *.tmp
 
 # 浏览器自动化产物

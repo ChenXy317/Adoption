@@ -17,6 +17,8 @@ function applyTheme(name) {
   const root = document.documentElement;
   if (name === "dark") root.removeAttribute("data-theme");
   else root.setAttribute("data-theme", name);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", name === "light" ? "#eef1fa" : "#05060f");
 }
 
 export const useUiStore = defineStore("ui", {

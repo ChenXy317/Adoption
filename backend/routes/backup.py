@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from ai_client import AIClientError
 from db import get_session
 from game import events, memory
+from game.attributes import clamp
 from helpers import (
     error,
     get_global_character,
@@ -26,6 +27,7 @@ from helpers import (
     sanitize_settings,
 )
 from orm import (
+    AttributeDef,
     AttributeValue,
     EventDef,
     EventLog,
@@ -222,6 +224,12 @@ def import_backup(session: Session, payload: dict, name: str | None = None) -> S
     session.add(save)
     session.flush()
 
+    defs_map = {
+        row.key: row
+        for row in session.scalars(
+            select(AttributeDef).where(AttributeDef.enabled.is_(True))
+        )
+    }
     seen_attr_keys: set[str] = set()
     for item in payload.get("attributes") or []:
         if not isinstance(item, dict):
@@ -232,11 +240,25 @@ def import_backup(session: Session, payload: dict, name: str | None = None) -> S
         if key in seen_attr_keys:
             error("invalid_backup", f"备份属性 key 重复：{key}", 400)
         seen_attr_keys.add(key)
+        value = _as_float(item.get("value"))
+        definition = defs_map.get(key)
+        if definition is not None:
+            value = clamp(value, definition.min, definition.max)
         session.add(
             AttributeValue(
                 save_id=save.id,
                 attr_key=key,
-                value=_as_float(item.get("value")),
+                value=value,
+            )
+        )
+    for key, definition in defs_map.items():
+        if key in seen_attr_keys:
+            continue
+        session.add(
+            AttributeValue(
+                save_id=save.id,
+                attr_key=key,
+                value=definition.default_value,
             )
         )
 

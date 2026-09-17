@@ -1854,8 +1854,7 @@
     "effects": {
       "attrs": {
         "money": 130
-      },
-      "advance_minutes": 240
+      }
     },
     "prompt_template": "你在咖啡馆做了四个小时：擦桌、出餐、对客人点单。回来时口袋里多了 130 元，袖口带着一点咖啡香。",
     "once": false,
@@ -1874,8 +1873,7 @@
     "effects": {
       "attrs": {
         "money": 90
-      },
-      "advance_minutes": 180
+      }
     },
     "prompt_template": "你在街口站了三个小时发传单，嗓子有点干，回来时口袋里多了 90 元。",
     "once": false,
@@ -1894,8 +1892,7 @@
     "effects": {
       "attrs": {
         "money": 150
-      },
-      "advance_minutes": 180
+      }
     },
     "prompt_template": "你帮忙做了三小时家教助教：对答案、盯作业、讲了一道简单题。回来时口袋里多了 150 元。",
     "once": false,

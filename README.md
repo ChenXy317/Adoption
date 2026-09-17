@@ -26,7 +26,7 @@
 
 - MySQL 8
 - [uv](https://github.com/astral-sh/uv)（后端环境）
-- Node.js 24（前端构建）
+- Node.js 20.19+（前端构建；Vite 7 要求）
 
 ## 安装
 
@@ -61,7 +61,7 @@ cd backend
 .venv\Scripts\python.exe main.py  # Windows
 ```
 
-默认地址：`http://127.0.0.1:18730`。端口可通过 `.env` 中的 `APP_PORT` 修改。
+默认地址：`http://127.0.0.1:18730`。端口可通过 `.env` 中的 `APP_PORT` 修改（开发时 Vite 会读取同一变量代理 `/api`）。服务无登录鉴权，请保持 `APP_HOST` 为本机回环地址。
 
 开发时前后端可分开跑：
 
@@ -94,4 +94,4 @@ cd backend
 .venv/bin/python -m unittest discover -s tests
 ```
 
-集成测试使用独立数据库 `new_idea_test`，结束后自动删除，需要本机 MySQL 可用。
+需要本机 MySQL 可用，且 `MYSQL_PASSWORD` 非空（收集用例时就会连接配置）。集成测试使用独立数据库 `new_idea_test`，结束后自动删除。

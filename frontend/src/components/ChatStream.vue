@@ -39,10 +39,14 @@ watch(
     const last = chat.messages[chat.messages.length - 1];
     return last ? `${last.id}:${last.content.length}` : "";
   },
-  async () => {
+  async (curr, prev) => {
+    const el = scrollEl.value;
+    if (!el) return;
+    const stick = el.scrollHeight - el.scrollTop - el.clientHeight < 96;
+    const idChanged = !prev || String(curr).split(":")[0] !== String(prev).split(":")[0];
     await nextTick();
-    if (scrollEl.value) {
-      scrollEl.value.scrollTop = scrollEl.value.scrollHeight;
+    if (idChanged || stick) {
+      el.scrollTop = el.scrollHeight;
     }
   }
 );

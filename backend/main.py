@@ -81,8 +81,9 @@ async def lifespan(app: FastAPI):
         pending_saves = memory.requeue_interrupted(session)
     finally:
         session.close()
+    memory.bind_loop(asyncio.get_running_loop())
     for save_id in pending_saves:
-        asyncio.create_task(memory.safe_run_summary(save_id))
+        memory.spawn_background(save_id)
         logger.info("补跑中断的记忆总结任务: save=%s", save_id)
     logger.info("服务初始化完成")
     yield
@@ -165,7 +166,7 @@ if dist_dir.is_dir() and any(dist_dir.iterdir()):
 
     @app.get("/{full_path:path}", include_in_schema=False)
     async def spa_fallback(full_path: str):
-        if full_path.startswith("api/"):
+        if full_path == "api" or full_path.startswith("api/"):
             raise HTTPException(
                 status_code=404,
                 detail={"code": "not_found", "message": "接口不存在", "detail": ""},

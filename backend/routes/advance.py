@@ -12,7 +12,13 @@ from sqlalchemy.orm import Session
 from config import TIME_MAX_JUMP_HOURS
 from db import get_session
 from game import clock, events
-from helpers import error, get_save_or_error, load_attr_values, save_settle_lock
+from helpers import (
+    error,
+    get_save_or_error,
+    load_attr_values,
+    require_chat_idle,
+    save_settle_lock,
+)
 from orm import AttributeDef, Message, Save
 from schemas import AdvanceIn
 
@@ -108,6 +114,7 @@ def _advance_and_settle(session: Session, save: Save, delta: int, source: str) -
 
 @router.post("/api/saves/{save_id}/advance")
 def advance(save_id: int, req: AdvanceIn, session: Session = Depends(get_session)):
+    require_chat_idle(save_id)
     with save_settle_lock(save_id):
         save = get_save_or_error(session, save_id)
         settings = save.settings or {}

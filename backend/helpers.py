@@ -39,6 +39,8 @@ ENV_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,63}$")
 
 _save_locks: dict[int, threading.Lock] = {}
 _save_locks_guard = threading.Lock()
+_chat_inflight: set[int] = set()
+LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost", "testclient"}
 
 
 def save_settle_lock(save_id: int) -> threading.Lock:
@@ -51,10 +53,33 @@ def save_settle_lock(save_id: int) -> threading.Lock:
         return lock
 
 
+def begin_chat(save_id: int) -> bool:
+    """标记存档正在生成回复；已有进行中的对话时返回 False。"""
+    with _save_locks_guard:
+        if save_id in _chat_inflight:
+            return False
+        _chat_inflight.add(save_id)
+        return True
+
+
+def end_chat(save_id: int) -> None:
+    with _save_locks_guard:
+        _chat_inflight.discard(save_id)
+
+
+def require_chat_idle(save_id: int) -> None:
+    """生成回复期间拒绝推进时间、手动事件等写入。"""
+    with _save_locks_guard:
+        busy = save_id in _chat_inflight
+    if busy:
+        error("chat_busy", "正在生成回复，请稍后再试", 409)
+
+
 def drop_save_lock(save_id: int) -> None:
     """存档删除后释放对应锁，避免锁表随存档数量增长。"""
     with _save_locks_guard:
         _save_locks.pop(save_id, None)
+        _chat_inflight.discard(save_id)
 
 
 def _clamp_int(value, lo: int, hi: int, default: int) -> int:
@@ -138,6 +163,44 @@ def sanitize_settings(raw, base: dict | None = None) -> dict:
         out["content_prompt"] = ""
     if "memory_model" in out and not isinstance(out["memory_model"], str):
         out["memory_model"] = ""
+
+    if "params" in out:
+        raw_params = out.get("params")
+        prior_params = prior.get("params")
+        prior_params = prior_params if isinstance(prior_params, dict) else {}
+        if not isinstance(raw_params, dict):
+            out["params"] = dict(prior_params)
+        else:
+            cleaned = dict(prior_params)
+            for key in ("temperature", "top_p", "presence_penalty", "frequency_penalty"):
+                if key not in raw_params:
+                    continue
+                try:
+                    cleaned[key] = float(raw_params[key])
+                except (TypeError, ValueError):
+                    continue
+            if "num_predict" in raw_params:
+                try:
+                    requested = int(raw_params["num_predict"])
+                except (TypeError, ValueError):
+                    requested = 0
+                if requested > 0:
+                    cleaned["num_predict"] = requested
+                else:
+                    cleaned.pop("num_predict", None)
+            if "temperature" in cleaned:
+                cleaned["temperature"] = max(0.0, min(2.0, float(cleaned["temperature"])))
+            if "top_p" in cleaned:
+                cleaned["top_p"] = max(0.0, min(1.0, float(cleaned["top_p"])))
+            if "presence_penalty" in cleaned:
+                cleaned["presence_penalty"] = max(
+                    -2.0, min(2.0, float(cleaned["presence_penalty"]))
+                )
+            if "frequency_penalty" in cleaned:
+                cleaned["frequency_penalty"] = max(
+                    -2.0, min(2.0, float(cleaned["frequency_penalty"]))
+                )
+            out["params"] = cleaned
     return out
 
 

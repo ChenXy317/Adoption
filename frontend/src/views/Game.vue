@@ -166,7 +166,7 @@ function toggleDir(id) {
 }
 
 function syncOverlay() {
-  useOverlay.value = window.matchMedia("(max-width: 960px)").matches;
+  useOverlay.value = window.matchMedia("(max-width: 768px)").matches;
 }
 
 function onKeydown(e) {
@@ -176,9 +176,12 @@ function onKeydown(e) {
 }
 
 async function load(saveId) {
+  chat.resetForSave(saveId);
   try {
     await Promise.all([game.loadState(saveId), chat.loadMessages(saveId)]);
   } catch (e) {
+    if (e.name === "AbortError") return;
+    if (Number(props.id) !== Number(saveId)) return;
     ui.toast("error", e.message);
     router.push("/");
   }
@@ -192,7 +195,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-  chat.cancel();
+  chat.resetForSave(null);
 });
 
 onUnmounted(() => {
@@ -204,9 +207,12 @@ watch(
   () => props.id,
   (id) => {
     if (id == null) return;
-    chat.cancel();
     game.current = null;
     openDir.value = null;
+    memoryOpen.value = false;
+    defsOpen.value = false;
+    catalogOpen.value = false;
+    themeOpen.value = false;
     load(id);
   }
 );
@@ -408,8 +414,7 @@ html[data-theme="light"] .chat {
 /* ── 移动端（≤768px）：顶栏压缩横滑 + 纵向布局 + 底部功能条 ── */
 @media (max-width: 768px) {
   .game {
-    height: 100vh;
-    height: 100dvh;
+    height: var(--vvh, 100dvh);
   }
 
   .topbar {
@@ -456,7 +461,7 @@ html[data-theme="light"] .chat {
   .body {
     flex-direction: column;
     gap: 8px;
-    padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px));
+    padding: 8px;
   }
 
   .chat {

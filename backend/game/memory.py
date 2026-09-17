@@ -10,6 +10,7 @@ last_summarized_message_id；失败与中断记 memory_jobs 留待下次重试�
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
@@ -34,6 +35,43 @@ from helpers import get_runtime, save_settle_lock
 from orm import EventLog, Memory, MemoryJob, Message, Save
 
 logger = logging.getLogger(__name__)
+
+_loop: asyncio.AbstractEventLoop | None = None
+_bg_tasks: set[asyncio.Task] = set()
+
+
+def bind_loop(loop: asyncio.AbstractEventLoop) -> None:
+    """服务启动时绑定事件循环，供工作线程调度总结任务。"""
+    global _loop
+    _loop = loop
+
+
+def spawn_background(save_id: int) -> None:
+    """在事件循环中启动一次记忆总结（可从工作线程调用）。"""
+    coro = safe_run_summary(save_id)
+
+    def _start(task_coro=coro) -> None:
+        if _loop is None:
+            task_coro.close()
+            return
+        task = _loop.create_task(task_coro)
+        _bg_tasks.add(task)
+        task.add_done_callback(_bg_tasks.discard)
+
+    try:
+        running = asyncio.get_running_loop()
+    except RuntimeError:
+        running = None
+    if running is not None:
+        task = running.create_task(coro)
+        _bg_tasks.add(task)
+        task.add_done_callback(_bg_tasks.discard)
+        return
+    if _loop is not None and _loop.is_running():
+        _loop.call_soon_threadsafe(_start)
+        return
+    coro.close()
+    logger.warning("事件循环未运行，记忆总结待下次启动补跑: save=%s", save_id)
 
 KINDS = ("fact", "event", "relationship", "promise")
 CORE_IMPORTANCE = 8
@@ -168,20 +206,22 @@ def select_memories(
     return selected
 
 
-def timeline_lines(messages: list, logs: list) -> list[str]:
-    """把消息与事件日志整理为按虚拟时间排序的文本时间线。"""
+def timeline_entries(messages: list, logs: list) -> list[tuple[str, int | None]]:
+    """按虚拟时间排序的 (文本, 消息id) 时间线；事件日志的消息 id 为 None。"""
     role_names = {"user": "玩家", "assistant": "角色", "event": "事件", "system": "系统"}
-    items: list[tuple[int, int, int, str]] = []
+    items: list[tuple[int, int, int, str, int | None]] = []
     for m in messages:
         content = str(getattr(m, "content", "") or "").strip()
         if not content:
             continue
         role = role_names.get(str(getattr(m, "role", "")), "记录")
+        msg_id = int(getattr(m, "id", 0) or 0)
         items.append((
             int(getattr(m, "game_minutes_at", 0) or 0),
             0,
-            int(getattr(m, "id", 0) or 0),
+            msg_id,
             f"[{role}] {content}",
+            msg_id or None,
         ))
     for log in logs:
         meta = getattr(log, "meta", None) or {}
@@ -194,9 +234,15 @@ def timeline_lines(messages: list, logs: list) -> list[str]:
             1,
             int(getattr(log, "id", 0) or 0),
             f"[事件·{name}] {content}",
+            None,
         ))
     items.sort(key=lambda x: (x[0], x[1], x[2]))
-    return [text for *_, text in items]
+    return [(text, msg_id) for *_, text, msg_id in items]
+
+
+def timeline_lines(messages: list, logs: list) -> list[str]:
+    """把消息与事件日志整理为按虚拟时间排序的文本时间线。"""
+    return [text for text, _ in timeline_entries(messages, logs)]
 
 
 def clip_lines(lines: list[str], budget: int = MEMORY_PROMPT_CHAR_BUDGET) -> list[str]:
@@ -212,8 +258,32 @@ def clip_lines(lines: list[str], budget: int = MEMORY_PROMPT_CHAR_BUDGET) -> lis
     return kept
 
 
-def build_summary_messages(save: Save, messages: list, logs: list, existing: list) -> list[dict]:
-    """组装总结请求（system + user），对话原文按预算保留最近部分。"""
+def clip_oldest(
+    entries: list[tuple[str, int | None]], budget: int = MEMORY_PROMPT_CHAR_BUDGET
+) -> tuple[list[str], int | None]:
+    """从最早的记录起填充预算，返回 (文本行, 实际纳入的最后一条消息 id)。"""
+    kept: list[str] = []
+    used = 0
+    last_id: int | None = None
+    for text, msg_id in entries:
+        extra = len(text) + (1 if kept else 0)
+        if used + extra > budget:
+            if not kept:
+                kept.append(text[: max(0, budget)])
+                if msg_id:
+                    last_id = msg_id
+            break
+        kept.append(text)
+        used += extra
+        if msg_id:
+            last_id = msg_id
+    return kept, last_id
+
+
+def build_summary_messages(
+    save: Save, messages: list, logs: list, existing: list
+) -> tuple[list[dict], int | None]:
+    """组装总结请求（system + user），从最早未总结内容起按预算截取。"""
     parts: list[str] = []
     if existing:
         parts.append("# 已有记忆（不要重复输出）")
@@ -221,14 +291,15 @@ def build_summary_messages(save: Save, messages: list, logs: list, existing: lis
             content = str(getattr(row, "content", "") or "").strip()
             if content:
                 parts.append(f"- [{getattr(row, 'kind', 'fact')}] {content}")
-    lines = clip_lines(timeline_lines(messages, logs))
+    lines, last_id = clip_oldest(timeline_entries(messages, logs))
     if lines:
         parts.append("# 对话与事件记录")
         parts.extend(lines)
-    return [
+    payload = [
         {"role": "system", "content": SUMMARY_SYSTEM},
         {"role": "user", "content": "\n".join(parts)},
     ]
+    return payload, last_id
 
 
 # ── DB 区 ──
@@ -392,11 +463,19 @@ def _prepare_summary(save_id: int) -> dict | None:
                 _finish_job(session, job.id, "failed", str(e))
                 session.commit()
                 return None
+            prompt_messages, last_included = build_summary_messages(
+                save, messages, logs, existing
+            )
+            last_message_id = (
+                int(last_included)
+                if last_included is not None
+                else int(messages[-1].id)
+            )
             return {
                 "save_id": save_id,
                 "job_id": job.id,
-                "last_message_id": int(messages[-1].id),
-                "prompt_messages": build_summary_messages(save, messages, logs, existing),
+                "last_message_id": last_message_id,
+                "prompt_messages": prompt_messages,
                 "model_id": runtime["model_id"],
                 "base_url": runtime["base_url"],
                 "api_key": runtime["api_key"],

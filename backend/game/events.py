@@ -174,7 +174,7 @@ def _leaf(cond: dict, ctx: EvalContext, *, skip_types: set[str] | None = None) -
     if kind == "since_event":
         since = ctx.minutes_since.get(str(cond.get("key") or ""))
         if since is None:
-            return True
+            return False
         return compare(op, since, cond.get("value"))
     return False
 
@@ -427,8 +427,14 @@ def apply_event(
         values.update(updated)
         write_changes(session, save.id, values, attr_changes)
     flags = effects.get("flags") or {}
+    applied_flags: dict = {}
     for key, value in flags.items():
-        set_flag(session, save.id, str(key), value)
+        name = str(key).strip()[:64]
+        if not name or name in _AI_FLAG_RESERVED:
+            continue
+        set_flag(session, save.id, name, value)
+        applied_flags[name] = value
+    flags = applied_flags
     for key in effects.get("unlock_events") or []:
         set_flag(session, save.id, f"event_unlocked:{key}", True)
     for key in effects.get("unlock_scenes") or []:
@@ -538,22 +544,25 @@ def apply_neglect(
         return []
 
     fallback = clock.absolute_minutes(0, save.settings or {})
-    last_dialogue = int(
-        session.scalar(
-            select(func.max(Message.game_minutes_at)).where(
-                Message.save_id == save.id,
-                Message.role.in_(("user", "assistant")),
-            )
+    raw_last = session.scalar(
+        select(func.max(Message.game_minutes_at)).where(
+            Message.save_id == save.id,
+            Message.role.in_(("user", "assistant")),
         )
-        or fallback
     )
+    last_dialogue = int(raw_last) if raw_last is not None else fallback
     silent_days = max(0, int(now_abs) - last_dialogue) // clock.DAY_MINUTES
     if silent_days < threshold_days:
         return []
 
     state_row = session.get(SaveFlag, (save.id, "neglect"))
     state = _raw_flag(state_row.value) if state_row is not None else {}
-    if not isinstance(state, dict) or int(state.get("dialogue_at") or -1) != last_dialogue:
+    stored_at = state.get("dialogue_at") if isinstance(state, dict) else None
+    try:
+        stored_at = int(stored_at) if stored_at is not None else None
+    except (TypeError, ValueError):
+        stored_at = None
+    if not isinstance(state, dict) or stored_at != last_dialogue:
         state = {"dialogue_at": last_dialogue, "applied_days": 0}
     else:
         state = dict(state)

@@ -141,6 +141,17 @@ class TimelineTest(unittest.TestCase):
     def test_clip_small_budget(self):
         self.assertEqual(memory.clip_lines(["x" * 100], budget=10), [])
 
+    def test_clip_oldest_keeps_earliest_and_last_id(self):
+        entries = [("a" * 10, 1), ("b" * 10, 2), ("c" * 10, 3)]
+        kept, last_id = memory.clip_oldest(entries, budget=25)
+        self.assertEqual(kept, ["a" * 10, "b" * 10])
+        self.assertEqual(last_id, 2)
+
+    def test_clip_oldest_truncates_first_oversized(self):
+        kept, last_id = memory.clip_oldest([("x" * 100, 9)], budget=10)
+        self.assertEqual(kept, ["x" * 10])
+        self.assertEqual(last_id, 9)
+
 
 class SummaryMessagesTest(unittest.TestCase):
     def test_includes_existing_and_timeline(self):
@@ -154,12 +165,13 @@ class SummaryMessagesTest(unittest.TestCase):
             )
         ]
         existing = [SimpleNamespace(kind="fact", content="她怕黑。")]
-        out = memory.build_summary_messages(save, messages, logs, existing)
+        out, last_id = memory.build_summary_messages(save, messages, logs, existing)
         self.assertEqual(out[0]["role"], "system")
         self.assertIn("JSON", out[0]["content"])
         self.assertIn("已有记忆", out[1]["content"])
         self.assertIn("她怕黑", out[1]["content"])
         self.assertIn("[玩家] 今天下雨", out[1]["content"])
+        self.assertEqual(last_id, 1)
 
 
 class MemoryBlockTest(unittest.TestCase):

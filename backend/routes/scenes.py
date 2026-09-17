@@ -11,7 +11,13 @@ from sqlalchemy.orm import Session
 
 from db import get_session
 from game import clock, events, scenes
-from helpers import error, get_save_or_error, load_attr_values, save_settle_lock
+from helpers import (
+    error,
+    get_save_or_error,
+    load_attr_values,
+    require_chat_idle,
+    save_settle_lock,
+)
 from orm import AttributeDef, Message, SceneDef, SceneLog
 from schemas import SceneEndIn, SceneEnterIn
 
@@ -80,6 +86,7 @@ def list_scenes(
 def enter_scene(
     save_id: int, req: SceneEnterIn, session: Session = Depends(get_session)
 ):
+    require_chat_idle(save_id)
     with save_settle_lock(save_id):
         save = get_save_or_error(session, save_id)
         if scenes.get_active(session, save_id):
@@ -142,6 +149,7 @@ def enter_scene(
 def end_scene(
     save_id: int, req: SceneEndIn, session: Session = Depends(get_session)
 ):
+    require_chat_idle(save_id)
     with save_settle_lock(save_id):
         save = get_save_or_error(session, save_id)
         active = scenes.get_active(session, save_id)

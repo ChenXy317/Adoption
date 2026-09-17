@@ -97,6 +97,11 @@ def get_state(save_id: int, session: Session = Depends(get_session)):
         })
     action_items = events.manual_candidates(session, save, values)
     flags = events.load_flags(session, save_id)
+    attrs = attribute_items(defs, values)
+    money = next(
+        (item["value"] for item in attrs if item["key"] == "money"),
+        values.get("money", 0.0),
+    )
     return {
         "save": {
             "id": save.id,
@@ -114,8 +119,8 @@ def get_state(save_id: int, session: Session = Depends(get_session)):
             **split,
             "label": clock.time_label(absolute),
         },
-        "attributes": attribute_items(defs, values),
-        "money": values.get("money", 0.0),
+        "attributes": attrs,
+        "money": money,
         "active_scene": scenes.public_active(active_flag),
         "recent_events": recent_events,
         "manual_events": [

@@ -265,9 +265,12 @@ async def test_model(
         api_key = resolve_secret(provider)
     except ValueError as e:
         error("missing_api_key", str(e), 400)
+    model_id = model.model_id
+    base_url = provider.base_url
+    session.close()
     return await ai.test_hello(
-        model_id=model.model_id,
-        base_url=provider.base_url,
+        model_id=model_id,
+        base_url=base_url,
         api_key=api_key,
     )
 

@@ -3,14 +3,21 @@
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from db import get_session
 from game import clock, events
 from game.attributes import apply_effects
-from helpers import error, get_save_or_error, load_attr_values, save_settle_lock
+from helpers import (
+    LOOPBACK_HOSTS,
+    error,
+    get_save_or_error,
+    load_attr_values,
+    require_chat_idle,
+    save_settle_lock,
+)
 from orm import AttributeDef, EventDef, EventLog, Message
 
 router = APIRouter(tags=["events"])
@@ -62,10 +69,16 @@ def list_events(
 def trigger_manual(
     save_id: int,
     event_key: str,
+    request: Request,
     debug: bool = Query(default=False),
     session: Session = Depends(get_session),
 ):
-    """手动触发（行动菜单）；debug=true 时允许任意分类并跳过条件/余额校验（调试用）。"""
+    """手动触发（行动菜单）；debug=true 时允许任意分类并跳过条件/余额校验（仅本机）。"""
+    if debug:
+        host = request.client.host if request.client else ""
+        if host not in LOOPBACK_HOSTS:
+            error("debug_forbidden", "调试触发仅允许本机调用", 403)
+    require_chat_idle(save_id)
     with save_settle_lock(save_id):
         save = get_save_or_error(session, save_id)
         event = session.scalar(select(EventDef).where(EventDef.key == event_key))

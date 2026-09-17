@@ -67,6 +67,7 @@ from schemas import (
     EventDefPatch,
     ProviderIn,
     SaveCreate,
+    SaveUpdate,
     SceneDefIn,
     SceneDefPatch,
     SceneEndIn,
@@ -75,6 +76,12 @@ from schemas import (
 from seeds.loader import apply_event_seeds, apply_scene_seeds
 
 TEST_DATABASE = f"{MYSQL_DATABASE}_test"
+
+
+def _loopback_request(host: str = "127.0.0.1"):
+    request = mock.Mock()
+    request.client = mock.Mock(host=host)
+    return request
 
 
 def _make_engine(database: str):
@@ -434,7 +441,7 @@ class SettlementIntegrationTest(unittest.TestCase):
         )
 
         events.settle_time(
-            session, save, defs, values, save.game_minutes + 10, source="manual"
+            session, save, defs, values, save.game_minutes + 10, source="chat"
         )
         session.commit()
         self.assertEqual(scenes.get_active(session, save.id)["key"], "scene_b")
@@ -474,7 +481,9 @@ class SettlementIntegrationTest(unittest.TestCase):
         session.commit()
         save_id = save.id
 
-        data = events_route.trigger_manual(save_id, "work_x", session=session)
+        data = events_route.trigger_manual(
+            save_id, "work_x", _loopback_request(), session=session
+        )
 
         self.assertEqual(data["advance_minutes"], 240)
         self.assertEqual(data["changes"][0]["key"], "money")
@@ -509,7 +518,9 @@ class SettlementIntegrationTest(unittest.TestCase):
         session.commit()
         save_id = save.id
 
-        events_route.trigger_manual(save_id, "gift_x", session=session)
+        events_route.trigger_manual(
+            save_id, "gift_x", _loopback_request(), session=session
+        )
 
         session.commit()
         values = load_attr_values(session, save_id)
@@ -776,7 +787,8 @@ class SettlementIntegrationTest(unittest.TestCase):
         )
         self.assertEqual(assistant.content, "回复文本")
         self.assertEqual(assistant.meta["attrs"][0]["key"], "affection")
-        self.assertAlmostEqual(load_attr_values(session, save_id)["affection"], 13.0)
+        self.assertIn("ticks", assistant.meta)
+        self.assertAlmostEqual(load_attr_values(session, save_id)["affection"], 12.0)
 
         fallback = chat_route._settle(save_id, "第二条", None, False)
         self.assertFalse(fallback["parsed"])
@@ -1189,12 +1201,20 @@ class SettlementIntegrationTest(unittest.TestCase):
 
         with self.assertRaises(HTTPException) as blocked:
             events_route.trigger_manual(
-                save_id, "fixed_dbg", debug=False, session=session
+                save_id,
+                "fixed_dbg",
+                _loopback_request(),
+                debug=False,
+                session=session,
             )
         self.assertEqual(blocked.exception.status_code, 400)
 
         data = events_route.trigger_manual(
-            save_id, "fixed_dbg", debug=True, session=session
+            save_id,
+            "fixed_dbg",
+            _loopback_request(),
+            debug=True,
+            session=session,
         )
         self.assertEqual(data["event"]["key"], "fixed_dbg")
         session.commit()
@@ -1228,6 +1248,14 @@ class SettlementIntegrationTest(unittest.TestCase):
         self.assertEqual(row.settings["advance"]["default_minutes"], 10)
         self.assertEqual(row.settings["calendar"]["month"], 12)
 
+        saves_route.update_save(
+            created["id"],
+            SaveUpdate(settings={"params": "bad"}),
+            session=session,
+        )
+        row = session.get(Save, created["id"])
+        self.assertIsInstance(row.settings.get("params"), dict)
+
         save_settle_lock(created["id"])
         self.assertIn(created["id"], helpers._save_locks)
         saves_route.delete_save(created["id"], session=session)
@@ -1256,6 +1284,31 @@ class SettlementIntegrationTest(unittest.TestCase):
         self.assertEqual(imported.settings["advance"]["max_per_message"], 1)
         self.assertEqual(imported.settings["calendar"]["hour"], 23)
         self.assertEqual(imported.settings["content_prompt"], "")
+
+    def test_import_backup_clamps_and_fills_attributes(self):
+        session = self._session()
+        defs = self._defs(session)
+        self._save(session, defs)
+        session.commit()
+
+        payload = {
+            "format": backup_route.BACKUP_FORMAT,
+            "version": backup_route.BACKUP_VERSION,
+            "save": {"name": "属性档"},
+            "attributes": [
+                {"key": "affection", "value": 1e9},
+                {"key": "money", "value": -50},
+            ],
+        }
+        imported = backup_route.import_backup(session, payload)
+        session.commit()
+        values = load_attr_values(session, imported.id)
+        self.assertEqual(values["affection"], 100.0)
+        self.assertEqual(values["money"], 0.0)
+        self.assertIn("trust", values)
+        state = state_route.get_state(imported.id, session=session)
+        money_attr = next(a for a in state["attributes"] if a["key"] == "money")
+        self.assertEqual(state["money"], money_attr["value"])
 
     def test_catalog_provider_and_model_crud(self):
         session = self._session()

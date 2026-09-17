@@ -16,6 +16,7 @@ from game.prompt import (
     _event_block,
     _persona_block,
     _sample_lines_block,
+    _stage_block,
     _stage_note,
 )
 from game.tags import StateTagStripper, parse_state
@@ -117,9 +118,19 @@ class AttributesTest(unittest.TestCase):
         new_values, changes = apply_deltas(
             defs, values, {"affection": 999, "money": 100, "unknown": 5}
         )
-        self.assertEqual(new_values["affection"], 70.0)
+        self.assertEqual(new_values["affection"], 51.0)
         self.assertEqual(new_values["money"], 2000.0)
         self.assertEqual([c["key"] for c in changes], ["affection"])
+
+    def test_apply_deltas_bond_gain_before_soft_cap(self):
+        defs = {"affection": make_def("affection")}
+        new_values, _ = apply_deltas(defs, {"affection": 10.0}, {"affection": 9})
+        self.assertEqual(new_values["affection"], 12.0)
+
+    def test_apply_deltas_bond_loss_larger_than_gain(self):
+        defs = {"trust": make_def("trust")}
+        new_values, _ = apply_deltas(defs, {"trust": 20.0}, {"trust": -20})
+        self.assertEqual(new_values["trust"], 16.0)
 
     def test_apply_deltas_rejects_non_dict(self):
         defs = {"affection": make_def("affection")}
@@ -286,6 +297,15 @@ class PromptTest(unittest.TestCase):
         note = _stage_note(self.make_character(), "stranger", "陌生")
         self.assertIn("戒备", note)
 
+    def test_stage_block_is_hard_constraint(self):
+        block = _stage_block(
+            self.make_character(), "stranger", "陌生", {"affection": 10, "trust": 10}
+        )
+        self.assertIn("硬约束", block)
+        self.assertIn("陌生", block)
+        self.assertIn("禁止", block)
+        self.assertIn("不要出现", block)
+
     def test_sample_lines(self):
         block = _sample_lines_block(self.make_character())
         self.assertIn("……嗯。", block)
@@ -305,6 +325,7 @@ class PromptTest(unittest.TestCase):
         self.assertIn("mood_label", STATE_PROTOCOL)
         self.assertIn("flags", STATE_PROTOCOL)
         self.assertIn("scene", STATE_PROTOCOL)
+        self.assertIn("克制", STATE_PROTOCOL)
 
 
 if __name__ == "__main__":

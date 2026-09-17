@@ -136,15 +136,15 @@ class ShouldFinishTest(unittest.TestCase):
 
     def test_max_turns_forced(self):
         scene = make_scene(min_turns=3, max_turns=4)
-        self.assertIsNone(should_finish(scene, 4, ai_end=False, exit_met=False))
+        self.assertIsNone(should_finish(scene, 3, ai_end=False, exit_met=False))
         self.assertEqual(
-            should_finish(scene, 5, ai_end=False, exit_met=False), "max_turns"
+            should_finish(scene, 4, ai_end=False, exit_met=False), "max_turns"
         )
 
     def test_ai_end_takes_priority_over_max(self):
         scene = make_scene(min_turns=3, max_turns=4)
         self.assertEqual(
-            should_finish(scene, 5, ai_end=True, exit_met=False), "ai"
+            should_finish(scene, 4, ai_end=True, exit_met=False), "ai"
         )
 
     def test_zero_min_turns(self):
@@ -176,9 +176,10 @@ class SceneBlockTest(unittest.TestCase):
         self.assertNotIn('"action":"end"', text)
 
     def test_finale_instruction_at_max(self):
-        text = scene_block(self.make_active(turns=12))
+        text = scene_block(self.make_active(turns=11))
         self.assertIn("收尾", text)
         self.assertIn('"action":"end"', text)
+        self.assertIn("收尾", scene_block(self.make_active(turns=12)))
 
     def test_prompt_budget(self):
         text = scene_block(self.make_active(prompt="很长" * 1000))

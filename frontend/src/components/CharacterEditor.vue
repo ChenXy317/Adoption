@@ -9,8 +9,8 @@
         <span v-if="character.character?.user_edited" class="edited-badge">已修改</span>
       </div>
       <div class="row">
-        <button class="btn" :disabled="busy" @click="resetAll">恢复内置设定</button>
-        <button class="btn primary" :disabled="busy" @click="save">
+        <button class="btn" :disabled="busy || !character.character" @click="resetAll">恢复内置设定</button>
+        <button class="btn primary" :disabled="busy || !character.character" @click="save">
           {{ busy ? "保存中…" : "保存" }}
         </button>
       </div>
@@ -230,7 +230,7 @@ function buildPersona() {
 }
 
 async function save() {
-  if (busy.value) return;
+  if (busy.value || !character.character) return;
   if (!String(form.name || "").trim()) {
     ui.toast("error", "请填写角色姓名");
     return;

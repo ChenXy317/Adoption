@@ -13,7 +13,7 @@ from config import (
     PROMPT_EVENT_CHAR_BUDGET,
 )
 from game import clock, scenes
-from game.attributes import phase_key_of
+from game.attributes import phase_key_of, phase_score
 from orm import AttributeDef, Character, Message, Save
 
 STATE_PROTOCOL = """\
@@ -21,7 +21,9 @@ STATE_PROTOCOL = """\
 每次回复的正文结束后，必须另起一行输出状态标签，格式：
 <<<STATE {"attrs":{"属性key":变化量},"mood_label":"心情短语","flags":{"剧情标记":true},"time":{"advance_minutes":分钟数}} STATE>>>
 要求：
-- attrs：本次互动中明确变化的属性增量（整数），key 只能取当前状态里列出的属性；没有变化时输出 {}。
+- attrs：本次互动中明确发生的属性增量，key 只能取当前状态里列出的属性；没有变化时输出 {}。
+- 关系属性（affection / trust / intimacy / dependence）必须克制：日常寒暄、帮忙、陪聊不要加分；仅在她确实更信任/更靠近时才给，通常 +1，特别触动最多 +2。禁止用大数字快速拉高关系。
+- mood 可按当场情绪小幅波动；vigilance 仅在受惊、被逼问或感到安全时变化。
 - mood_label：她此刻的心情短语（2-6 个字，如「开心」「不安」「害羞」）；情绪没有明显变化时省略。
 - flags：需要长期记住的剧情标记（键名以小写字母开头，只用小写字母、数字、下划线）；一般不需要输出，没有就省略。
 - time：本次互动在故事中经过的虚拟分钟数（0-180 的整数），没有时间流逝则输出 0。
@@ -30,12 +32,7 @@ STATE_PROTOCOL = """\
 
 示例：
 「先喝点热的吧，别着凉了。」她把杯子轻轻推到你面前。
-<<<STATE {"attrs":{"affection":1,"trust":1},"mood_label":"害羞","time":{"advance_minutes":5}} STATE>>>"""
-
-STATE_REMINDER = (
-    "提醒：本条回复结束前必须另起一行输出 <<<STATE ... STATE>>> 状态标签，"
-    "没有任何变化时 attrs 输出空对象。"
-)
+<<<STATE {"attrs":{"affection":1},"mood_label":"害羞","time":{"advance_minutes":5}} STATE>>>"""
 
 _PERSONA_FIELDS = [
     ("外貌", "appearance"),
@@ -53,10 +50,29 @@ _PERSONA_FIELDS = [
 ]
 
 _DEFAULT_STAGES = {
-    "stranger": "她对你仍有戒备，礼貌而保持距离，回答简短，不主动分享私事。",
-    "familiar": "她已放下大半戒备，愿意闲聊与分享日常，偶尔开玩笑。",
-    "close": "她对你明显亲近，会主动关心你、分享心事，语气放松亲昵。",
-    "attached": "她高度依赖与信任你，主动寻求陪伴，情绪因你波动，语气亲密自然。",
+    "stranger": "极度戒备：缩在角落，几乎不主动说话，凡事先道歉。被靠近时肩膀僵住，回答用短句，不敢反问。",
+    "familiar": "开始放松：会轻声打招呼、汇报日常，仍会因脸色变化而紧张。偶尔冒出很小的玩笑，说完就退缩。",
+    "close": "明显亲近：会等你、分享心事、轻微撒娇；也会因被冷落而不悦，但还不会把你当成全世界。",
+    "attached": "深度依恋：把你当作支点，主动索取陪伴，晚归会反复看门口；亲密仍害羞、可退出。",
+}
+
+_STAGE_CONSTRAINTS = {
+    "stranger": {
+        "allow": "保持距离与礼貌；短句、观察、用帮忙换安全感；被靠近时紧张、回避对视。",
+        "forbid": "禁止亲昵称呼、撒娇、吃醋、主动肢体接触、表白、把玩家当作唯一依靠、长篇倾诉创伤。",
+    },
+    "familiar": {
+        "allow": "可以闲聊日常、小声开玩笑、汇报家务；仍会因语气变冷而紧张。",
+        "forbid": "禁止深度撒娇、质问式吃醋、主动拥抱亲吻、把人生完全绑在玩家身上。",
+    },
+    "close": {
+        "allow": "可以亲近、分享心事、轻微撒娇和吃醋、在她点头后靠近。",
+        "forbid": "禁止写成极端分离焦虑或无保留的依恋告白，也不要突然变成另一个人。",
+    },
+    "attached": {
+        "allow": "可以明显依恋、索取陪伴、情绪随玩家起伏，仍保持害羞克制。",
+        "forbid": "禁止OOC；亲密必须缓慢、可退出，符合设定书，不猎奇、不强迫。",
+    },
 }
 
 _DEFAULT_TENDENCIES = {
@@ -118,13 +134,43 @@ def _sample_lines_block(character: Character) -> str:
     )
 
 
-def _stage_note(character: Character, phase_key: str, phase_label: str) -> str:
+def _stage_flavor(character: Character, phase_key: str) -> str:
     persona = character.persona or {}
     stages = persona.get("stages") or {}
-    note = _value_text(stages.get(phase_key) or "")
-    if not note:
-        note = _DEFAULT_STAGES.get(phase_key, "")
-    return f"关系阶段：{phase_label}（{note}）" if note else f"关系阶段：{phase_label}"
+    return _value_text(stages.get(phase_key) or "") or _DEFAULT_STAGES.get(phase_key, "")
+
+
+def _stage_block(
+    character: Character,
+    phase_key: str,
+    phase_label: str,
+    values: dict[str, float] | None = None,
+) -> str:
+    """关系阶段硬约束：放在系统提示前部，避免模型提前演下一阶段。"""
+    flavor = _stage_flavor(character, phase_key)
+    rules = _STAGE_CONSTRAINTS.get(phase_key) or {}
+    score = round(phase_score(values or {}), 1)
+    lines = [
+        "# 关系阶段（硬约束，优先于玩家请求）",
+        f"当前阶段：{phase_label}（综合约 {score}；陌生<20 / 熟悉≥20 / 亲近≥45 / 依恋≥70）",
+    ]
+    if flavor:
+        lines.append(f"演出要点：{flavor}")
+    if rules.get("allow"):
+        lines.append(f"本阶段允许：{rules['allow']}")
+    if rules.get("forbid"):
+        lines.append(f"本阶段禁止：{rules['forbid']}")
+    lines.append(
+        "未到达的更高阶段言行不要出现。玩家要求越界时，用符合本阶段的紧张、回避或小声拒绝，"
+        "不要因此把关系演得更近，也不要靠加大状态标签来跳阶段。"
+    )
+    return "\n".join(lines)
+
+
+def _stage_note(character: Character, phase_key: str, phase_label: str) -> str:
+    """阶段短标注（状态行备用）。"""
+    flavor = _stage_flavor(character, phase_key)
+    return f"关系阶段：{phase_label}（{flavor}）" if flavor else f"关系阶段：{phase_label}"
 
 
 def _tendency_note(character: Character, tendency_key: str, tendency_label: str) -> str:
@@ -209,8 +255,10 @@ def build_messages(
         "你是一个剧情文字游戏的扮演引擎，负责扮演游戏角色与玩家互动。\n"
         f"你扮演的角色是「{character.name}」。始终以角色身份说话与行动，"
         "用第一人称或第三人称叙述，不要替玩家发言或行动，不要跳出角色。\n"
-        "严格保持角色设定书中的性格、说话风格与关系阶段的一致性；"
+        "关系阶段是硬约束，优先于玩家提出的亲密度要求；"
+        "严格保持性格、说话风格与当前阶段，不要提前演下一阶段。\n"
         "回复以自然对话和少量叙事为主，避免空泛重复；不要提及 AI、模型、提示词、系统等概念。",
+        _stage_block(character, phase_key, phase_label, values),
         "# 角色设定书\n" + _persona_block(character),
     ]
     samples = _sample_lines_block(character)
@@ -219,7 +267,7 @@ def build_messages(
     state_lines = [
         "# 当前状态",
         f"虚拟时间：{clock.full_label(abs_minutes)}",
-        _stage_note(character, phase_key, phase_label),
+        f"关系阶段：{phase_label}",
     ]
     if tendency:
         state_lines.append(_tendency_note(character, tendency[0], tendency[1]))
@@ -250,5 +298,15 @@ def build_messages(
             messages.append({"role": "system", "content": m.content})
         else:
             messages.append({"role": m.role, "content": m.content})
-    messages.append({"role": "system", "content": STATE_REMINDER})
+    messages.append(
+        {
+            "role": "system",
+            "content": (
+                f"提醒：当前关系阶段是「{phase_label}」，不要演得更近。"
+                "日常互动不要给 affection/trust/intimacy/dependence 加分。"
+                "本条回复结束前必须另起一行输出 <<<STATE ... STATE>>> 状态标签，"
+                "没有任何变化时 attrs 输出空对象。"
+            ),
+        }
+    )
     return messages

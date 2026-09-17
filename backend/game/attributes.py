@@ -3,8 +3,15 @@
 """
 from __future__ import annotations
 
-from config import ATTR_MAX_DELTA_PER_MESSAGE
+from config import (
+    ATTR_BOND_SOFT_CAP,
+    ATTR_MAX_BOND_GAIN_PER_MESSAGE,
+    ATTR_MAX_BOND_LOSS_PER_MESSAGE,
+    ATTR_MAX_DELTA_PER_MESSAGE,
+)
 from orm import AttributeDef
+
+BOND_KEYS = frozenset({"affection", "trust", "intimacy", "dependence"})
 
 PHASES = ("陌生", "熟悉", "亲近", "依恋")
 PHASE_KEYS = {
@@ -25,13 +32,18 @@ def clamp(value: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, value))
 
 
-def phase_of(values: dict[str, float]) -> str:
-    """关系阶段：由好感度/信任/依赖综合推导（简化版，M5 深化）。"""
-    score = (
-        values.get("affection", 0.0) * 0.5
-        + values.get("trust", 0.0) * 0.3
-        + values.get("dependence", 0.0) * 0.2
+def phase_score(values: dict[str, float]) -> float:
+    """关系综合分：好感 50% + 信任 30% + 依赖 20%。"""
+    return (
+        float(values.get("affection", 0.0)) * 0.5
+        + float(values.get("trust", 0.0)) * 0.3
+        + float(values.get("dependence", 0.0)) * 0.2
     )
+
+
+def phase_of(values: dict[str, float]) -> str:
+    """关系阶段：由好感度/信任/依赖综合推导。"""
+    score = phase_score(values)
     if score >= 70:
         return PHASES[3]
     if score >= 45:
@@ -64,6 +76,19 @@ def tendency_of(
     return "steady", TENDENCY_KEYS["steady"]
 
 
+def _clamp_ai_delta(key: str, current: float, delta: float, fallback_cap: float | None) -> float:
+    """单轮 AI 增量：关系属性正向更严，高分后进一步放慢。"""
+    if key in BOND_KEYS:
+        if delta > 0:
+            cap = float(ATTR_MAX_BOND_GAIN_PER_MESSAGE)
+            if current >= ATTR_BOND_SOFT_CAP:
+                cap = min(cap, 1.0)
+            return min(delta, cap)
+        return max(delta, -float(ATTR_MAX_BOND_LOSS_PER_MESSAGE))
+    cap = ATTR_MAX_DELTA_PER_MESSAGE if fallback_cap is None else fallback_cap
+    return clamp(delta, -float(cap), float(cap))
+
+
 def _apply_values(
     defs_map: dict[str, AttributeDef],
     values: dict[str, float],
@@ -87,11 +112,13 @@ def _apply_values(
             delta = float(raw_delta)
         except (TypeError, ValueError):
             continue
-        if max_delta is not None:
+        old = float(new_values.get(key, definition.default_value))
+        if respect_ai:
+            delta = _clamp_ai_delta(key, old, delta, max_delta)
+        elif max_delta is not None:
             delta = clamp(delta, -max_delta, max_delta)
         if delta == 0:
             continue
-        old = float(new_values.get(key, definition.default_value))
         new = clamp(old + delta, definition.min, definition.max)
         if new == old:
             continue

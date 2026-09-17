@@ -22,7 +22,19 @@ if not exist "backend\.venv\Scripts\python.exe" (
     echo [初始化] 未找到后端虚拟环境，正在创建...
     pushd backend
     uv venv --python 3.14
+    if errorlevel 1 (
+        popd
+        echo [错误] 虚拟环境创建失败，请检查是否已安装 uv。
+        pause
+        exit /b 1
+    )
     uv pip install -r requirements.txt
+    if errorlevel 1 (
+        popd
+        echo [错误] 依赖安装失败。
+        pause
+        exit /b 1
+    )
     popd
     if not exist "backend\.venv\Scripts\python.exe" (
         echo [错误] 后端环境创建失败，请检查是否已安装 uv。

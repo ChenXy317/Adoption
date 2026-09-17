@@ -99,7 +99,7 @@ textarea:focus {
     position: sticky;
     bottom: 0;
     gap: 8px;
-    padding: 10px 10px calc(10px + env(safe-area-inset-bottom, 0px));
+    padding: 10px;
     border-radius: 0 0 var(--radius-sm) var(--radius-sm);
   }
 

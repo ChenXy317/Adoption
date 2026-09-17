@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -42,7 +43,9 @@ except (ValueError, TypeError):
     raise RuntimeError("MYSQL_PORT 环境变量值无效，应为整数端口号")
 MYSQL_USER = os.environ.get("MYSQL_USER", "root")
 MYSQL_PASSWORD = os.environ.get("MYSQL_PASSWORD")
-MYSQL_DATABASE = os.environ.get("MYSQL_DATABASE", "new_idea")
+MYSQL_DATABASE = os.environ.get("MYSQL_DATABASE", "new_idea").strip()
+if not re.fullmatch(r"[A-Za-z0-9_]+", MYSQL_DATABASE or ""):
+    raise RuntimeError("MYSQL_DATABASE 只能包含字母、数字和下划线")
 MYSQL_CHARSET = "utf8mb4"
 
 # ── 生成参数（创建存档时预填，存档 settings 可覆盖）──
@@ -61,7 +64,10 @@ TIME_MAX_JUMP_HOURS = 24           # 单次显式动作/事件推进上限（小
 CALENDAR_DEFAULT = {"month": 5, "day": 1, "hour": 8, "minute": 0}
 
 # ── 属性 ──
-ATTR_MAX_DELTA_PER_MESSAGE = 20  # 单轮状态标签对单个属性的变化上限
+ATTR_MAX_DELTA_PER_MESSAGE = 8   # 心情/警戒等非关系属性：单轮 AI 变化上限
+ATTR_MAX_BOND_GAIN_PER_MESSAGE = 2   # 好感/信任/亲密/依赖：单轮 AI 正向上限
+ATTR_MAX_BOND_LOSS_PER_MESSAGE = 4   # 关系属性：单轮 AI 负向上限（冲突可以明显，但不会崩盘）
+ATTR_BOND_SOFT_CAP = 40          # 关系属性达到此后，单轮 AI 正向最多 +1
 MOOD_LABEL_TTL_HOURS = 24        # 心情短语的有效期（虚拟小时，超时不再注入）
 
 # ── 事件（详见 PLAN 5.3）──

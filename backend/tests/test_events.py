@@ -171,15 +171,19 @@ class EvaluateTest(unittest.TestCase):
         self.assertTrue(evaluate(None, ctx))
 
     def test_since_event(self):
-        ctx = make_ctx()
+        ctx = make_ctx(minutes_since={"story_done": 2000})
         self.assertTrue(evaluate(
             {"type": "since_event", "key": "story_done", "op": ">=", "value": 1000}, ctx
         ))
         self.assertFalse(evaluate(
             {"type": "since_event", "key": "story_done", "op": "<", "value": 1000}, ctx
         ))
-        self.assertTrue(evaluate(
-            {"type": "since_event", "key": "never", "op": ">=", "value": 1000}, ctx
+        never = make_ctx()
+        self.assertFalse(evaluate(
+            {"type": "since_event", "key": "never", "op": ">=", "value": 1000}, never
+        ))
+        self.assertFalse(evaluate(
+            {"type": "since_event", "key": "never", "op": "<", "value": 1000}, never
         ))
 
     def test_chance(self):
@@ -302,6 +306,17 @@ class SeedBalanceTest(unittest.TestCase):
         event = self.events["work_convenience"]
         self.assertEqual(event["cost"]["time_minutes"], WORK_HOURS * 60)
         self.assertEqual(event["effects"]["attrs"]["money"], WORK_PAY)
+
+    def test_work_events_do_not_double_time(self):
+        for key, event in self.events.items():
+            if event.get("category") != "work":
+                continue
+            cost = (event.get("cost") or {}).get("time_minutes") or 0
+            extra = (event.get("effects") or {}).get("advance_minutes") or 0
+            self.assertFalse(
+                bool(cost) and bool(extra),
+                msg=f"{key} 同时写了 cost.time_minutes 与 effects.advance_minutes",
+            )
 
     def test_gift_tiers(self):
         small = self.events["gift_small"]

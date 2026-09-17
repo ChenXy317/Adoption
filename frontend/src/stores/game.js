@@ -2,6 +2,8 @@ import { defineStore } from "pinia";
 
 import { apiDelete, apiGet, apiPost } from "../api/client";
 
+let stateAbort = null;
+
 export const useGameStore = defineStore("game", {
   state: () => ({
     saves: [],
@@ -27,7 +29,18 @@ export const useGameStore = defineStore("game", {
       this.saves = this.saves.filter((s) => s.id !== id);
     },
     async loadState(id) {
-      this.current = await apiGet(`/api/saves/${id}/state`);
+      stateAbort?.abort();
+      const controller = new AbortController();
+      stateAbort = controller;
+      try {
+        const data = await apiGet(`/api/saves/${id}/state`, controller.signal);
+        if (stateAbort !== controller) return data;
+        this.current = data;
+        return data;
+      } catch (e) {
+        if (e.name === "AbortError") return null;
+        throw e;
+      }
     },
     async advance(id, payload) {
       return apiPost(`/api/saves/${id}/advance`, payload);

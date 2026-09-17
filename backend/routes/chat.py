@@ -24,7 +24,9 @@ from game.attributes import apply_deltas, phase_of, tendency_of
 from game.prompt import build_messages
 from game.tags import StateTagStripper, parse_state
 from helpers import (
+    begin_chat,
     behavior_count,
+    end_chat,
     error,
     get_runtime,
     get_save_character,
@@ -57,80 +59,82 @@ def _prepare(save_id: int, message: str) -> dict:
     """流前：落用户消息 + 组装 prompt（含当前事件情境）。"""
     session = SessionLocal()
     try:
-        save = get_save_or_error(session, save_id)
-        if not save.model_key:
-            error("model_not_set", "该存档尚未选择模型，请先在「模型配置」中选择", 400)
-        runtime = get_runtime(session, save.model_key)
-        character = get_save_character(session, save)
-        if character is None:
-            error("character_missing", "该存档未关联女主角设定书", 400)
-        settings = save.settings or {}
-        abs_now = clock.absolute_minutes(save.game_minutes, settings)
-        user_msg = Message(
-            save_id=save_id,
-            role="user",
-            content=message,
-            game_minutes_at=abs_now,
-        )
-        session.add(user_msg)
-        session.commit()
-
-        history = list(
-            session.scalars(
-                select(Message)
-                .where(Message.save_id == save_id)
-                .order_by(Message.id.desc())
-                .limit(CHAT_HISTORY_MESSAGES)
+        with save_settle_lock(save_id):
+            save = get_save_or_error(session, save_id)
+            if not save.model_key:
+                error("model_not_set", "该存档尚未选择模型，请先在「模型配置」中选择", 400)
+            runtime = get_runtime(session, save.model_key)
+            character = get_save_character(session, save)
+            if character is None:
+                error("character_missing", "该存档未关联女主角设定书", 400)
+            settings = save.settings or {}
+            abs_now = clock.absolute_minutes(save.game_minutes, settings)
+            user_msg = Message(
+                save_id=save_id,
+                role="user",
+                content=message,
+                game_minutes_at=abs_now,
             )
-        )
-        history.reverse()
-        defs = list(
-            session.scalars(
-                select(AttributeDef).order_by(AttributeDef.sort, AttributeDef.id)
-            )
-        )
-        values = load_attr_values(session, save_id)
-        active_events = events.recent_events(
-            session, save, window_minutes=EVENT_RECENT_WINDOW_MINUTES, limit=3
-        )
-        if active_events:
-            events.mark_events_narrated(
-                session, [item["log_id"] for item in active_events]
-            )
-        active_scene = scenes.get_active(session, save_id)
-        memories = memory.retrieve(session, save_id)
-        if memories:
-            memory.mark_recalled(session, [m["id"] for m in memories])
-        flags = events.load_flags(session, save_id)
-        if active_events or memories:
+            session.add(user_msg)
             session.commit()
-        messages = build_messages(
-            save,
-            character,
-            defs,
-            values,
-            history,
-            settings,
-            active_events,
-            active_scene,
-            memories,
-            tendency=tendency_of(values, behavior_count(session, save_id)),
-            mood_label=events.mood_label_of(flags, abs_now),
-        )
-        return {
-            "messages": messages,
-            "model_id": runtime["model_id"],
-            "base_url": runtime["base_url"],
-            "api_key": runtime["api_key"],
-            "max_tokens": runtime["max_tokens"],
-            "params": settings.get("params") or {},
-            "user_message_id": user_msg.id,
-        }
+
+            history = list(
+                session.scalars(
+                    select(Message)
+                    .where(Message.save_id == save_id)
+                    .order_by(Message.id.desc())
+                    .limit(CHAT_HISTORY_MESSAGES)
+                )
+            )
+            history.reverse()
+            defs = list(
+                session.scalars(
+                    select(AttributeDef).order_by(AttributeDef.sort, AttributeDef.id)
+                )
+            )
+            values = load_attr_values(session, save_id)
+            active_events = events.recent_events(
+                session, save, window_minutes=EVENT_RECENT_WINDOW_MINUTES, limit=3
+            )
+            active_scene = scenes.get_active(session, save_id)
+            memories = memory.retrieve(session, save_id)
+            flags = events.load_flags(session, save_id)
+            messages = build_messages(
+                save,
+                character,
+                defs,
+                values,
+                history,
+                settings,
+                active_events,
+                active_scene,
+                memories,
+                tendency=tendency_of(values, behavior_count(session, save_id)),
+                mood_label=events.mood_label_of(flags, abs_now),
+            )
+            return {
+                "messages": messages,
+                "model_id": runtime["model_id"],
+                "base_url": runtime["base_url"],
+                "api_key": runtime["api_key"],
+                "max_tokens": runtime["max_tokens"],
+                "params": settings.get("params") or {},
+                "user_message_id": user_msg.id,
+                "event_log_ids": [item["log_id"] for item in active_events],
+                "memory_ids": [m["id"] for m in memories],
+            }
     finally:
         session.close()
 
 
-def _settle(save_id: int, text: str, tag_raw: str, interrupted: bool) -> dict:
+def _settle(
+    save_id: int,
+    text: str,
+    tag_raw: str,
+    interrupted: bool,
+    event_log_ids: list[int] | None = None,
+    memory_ids: list[int] | None = None,
+) -> dict:
     """流后：解析状态标签 → 应用属性/时间 → 事件结算 → 同一事务落库。"""
     session = SessionLocal()
     try:
@@ -189,18 +193,6 @@ def _settle(save_id: int, text: str, tag_raw: str, interrupted: bool) -> dict:
             if state is None:
                 meta["state_parse_failed"] = True
                 meta["tag_debug"] = (tag_raw or text[-500:])[:1000]
-            assistant = None
-            if text.strip():
-                assistant = Message(
-                    save_id=save_id,
-                    role="assistant",
-                    content=text,
-                    meta=meta,
-                    game_minutes_at=abs_before,
-                )
-                session.add(assistant)
-                session.flush()
-
             settled = events.settle_time(
                 session,
                 save,
@@ -219,8 +211,21 @@ def _settle(save_id: int, text: str, tag_raw: str, interrupted: bool) -> dict:
                 meta["scene_entered"] = scene_info["entered"]["key"]
             if scene_info.get("ended"):
                 meta["scene_ended"] = scene_info["ended"]["key"]
-            if assistant is not None:
-                assistant.game_minutes_at = settled["absolute_minutes"]
+            assistant = None
+            if text.strip():
+                assistant = Message(
+                    save_id=save_id,
+                    role="assistant",
+                    content=text,
+                    meta=dict(meta),
+                    game_minutes_at=settled["absolute_minutes"],
+                )
+                session.add(assistant)
+                session.flush()
+            if event_log_ids:
+                events.mark_events_narrated(session, event_log_ids)
+            if memory_ids:
+                memory.mark_recalled(session, memory_ids)
             session.commit()
             memory_due = memory.trigger_if_due(session, save_id)
 
@@ -269,12 +274,23 @@ def _settle(save_id: int, text: str, tag_raw: str, interrupted: bool) -> dict:
         session.close()
 
 
-def _settle_in_thread(save_id: int, text: str, tag_raw: str) -> None:
+def _settle_in_thread(save_id: int, text: str, tag_raw: str, prepared: dict) -> None:
     """客户端断开时的兜底结算（不阻塞事件循环）。"""
 
     def run():
         try:
-            _settle(save_id, text, tag_raw, True)
+            result = _settle(
+                save_id,
+                text,
+                tag_raw,
+                True,
+                event_log_ids=prepared.get("event_log_ids"),
+                memory_ids=prepared.get("memory_ids"),
+            )
+            if result.get("memory_due"):
+                memory.spawn_background(save_id)
+        except SaveGoneError:
+            logger.info("中断回复结算时存档已删除: save=%s", save_id)
         except Exception:
             logger.exception("中断回复的兜底结算失败")
 
@@ -312,109 +328,129 @@ async def _stream_events(save_id: int, prepared: dict, background: BackgroundTas
     settle_started = False
     try:
         try:
-            async for text in ai.stream_chat(
-                messages=prepared["messages"],
-                model_id=prepared["model_id"],
-                base_url=prepared["base_url"],
-                api_key=prepared["api_key"],
-                max_tokens=prepared["max_tokens"],
-                params=prepared["params"],
-            ):
-                visible = stripper.feed(text)
-                if visible:
-                    collected.append(visible)
-                    yield sse("chunk", {"text": visible})
-        except AIClientError as e:
-            error_payload = {"code": e.error_code, "message": str(e)}
-    except (asyncio.CancelledError, GeneratorExit):
-        if not settle_started:
-            if collected or stripper.tag_found:
-                _settle_in_thread(save_id, "".join(collected), stripper.state_raw)
-            else:
-                _drop_message_in_thread(save_id, prepared["user_message_id"])
-        raise
+            try:
+                async for text in ai.stream_chat(
+                    messages=prepared["messages"],
+                    model_id=prepared["model_id"],
+                    base_url=prepared["base_url"],
+                    api_key=prepared["api_key"],
+                    max_tokens=prepared["max_tokens"],
+                    params=prepared["params"],
+                ):
+                    visible = stripper.feed(text)
+                    if visible:
+                        collected.append(visible)
+                        yield sse("chunk", {"text": visible})
+            except AIClientError as e:
+                error_payload = {"code": e.error_code, "message": str(e)}
+            except Exception as e:
+                logger.exception("流式生成异常: save=%s", save_id)
+                error_payload = {
+                    "code": "request_failed",
+                    "message": str(e) or "回复生成失败",
+                }
 
-    tail = stripper.flush()
-    if tail:
-        collected.append(tail)
-        yield sse("chunk", {"text": tail})
+            tail = stripper.flush()
+            if tail:
+                collected.append(tail)
+                yield sse("chunk", {"text": tail})
 
-    text = "".join(collected)
-    if not text and not stripper.tag_found:
-        await run_in_threadpool(_drop_message, save_id, prepared["user_message_id"])
-        yield sse(
-            "error",
-            error_payload
-            or {"code": "empty_reply", "message": "模型没有返回任何内容"},
-        )
-        return
-    settled = None
-    settle_started = True
-    try:
-        settled = await run_in_threadpool(
-            _settle, save_id, text, stripper.state_raw, error_payload is not None
-        )
-    except SaveGoneError:
-        yield sse(
-            "error",
-            {"code": "save_not_found", "message": "存档不存在或已被删除"},
-        )
-        return
-    if settled["changes"] or settled["mood_label"]:
-        yield sse(
-            "state_update",
-            {
-                "attrs": settled["changes"],
-                "phase": settled["phase"],
-                "tendency": settled["tendency"],
-                "mood_label": settled["mood_label"],
-                "game_minutes": settled["game_minutes"],
-                "virtual_label": settled["virtual"]["label"],
-            },
-        )
-    if settled["events"] or settled["messages"]:
-        yield sse(
-            "event_triggered",
-            {
-                "events": settled["events"],
-                "messages": settled["messages"],
-            },
-        )
-    if settled["scene"]["entered"] or settled["scene"]["ended"]:
-        yield sse(
-            "scene_update",
-            {
-                "entered": settled["scene"]["entered"],
-                "ended": settled["scene"]["ended"],
-                "active": settled["scene"]["active"],
-            },
-        )
-    yield sse(
-        "time_update",
-        {
-            "advance_minutes": settled["time_advance"],
-            "game_minutes": settled["game_minutes"],
-            "virtual_label": settled["virtual"]["label"],
-            "virtual": settled["virtual"],
-        },
-    )
-    if settled.get("memory_due"):
-        background.add_task(memory.safe_run_summary, save_id)
-    if error_payload is not None:
-        yield sse("error", error_payload)
-    else:
-        yield sse(
-            "done",
-            {
-                "message_id": settled["message_id"],
-                "meta": {
-                    "attrs": settled["ai_changes"],
-                    "time_advance": settled["time_advance"],
+            text = "".join(collected)
+            if not text and not stripper.tag_found:
+                await run_in_threadpool(
+                    _drop_message, save_id, prepared["user_message_id"]
+                )
+                yield sse(
+                    "error",
+                    error_payload
+                    or {"code": "empty_reply", "message": "模型没有返回任何内容"},
+                )
+                return
+            settled = None
+            settle_started = True
+            try:
+                settled = await run_in_threadpool(
+                    _settle,
+                    save_id,
+                    text,
+                    stripper.state_raw,
+                    error_payload is not None,
+                    prepared.get("event_log_ids"),
+                    prepared.get("memory_ids"),
+                )
+            except SaveGoneError:
+                yield sse(
+                    "error",
+                    {"code": "save_not_found", "message": "存档不存在或已被删除"},
+                )
+                return
+            if settled.get("memory_due"):
+                memory.spawn_background(save_id)
+            if settled["changes"] or settled["mood_label"]:
+                yield sse(
+                    "state_update",
+                    {
+                        "attrs": settled["changes"],
+                        "phase": settled["phase"],
+                        "tendency": settled["tendency"],
+                        "mood_label": settled["mood_label"],
+                        "game_minutes": settled["game_minutes"],
+                        "virtual_label": settled["virtual"]["label"],
+                    },
+                )
+            if settled["events"] or settled["messages"]:
+                yield sse(
+                    "event_triggered",
+                    {
+                        "events": settled["events"],
+                        "messages": settled["messages"],
+                    },
+                )
+            if settled["scene"]["entered"] or settled["scene"]["ended"]:
+                yield sse(
+                    "scene_update",
+                    {
+                        "entered": settled["scene"]["entered"],
+                        "ended": settled["scene"]["ended"],
+                        "active": settled["scene"]["active"],
+                    },
+                )
+            yield sse(
+                "time_update",
+                {
+                    "advance_minutes": settled["time_advance"],
+                    "game_minutes": settled["game_minutes"],
+                    "virtual_label": settled["virtual"]["label"],
+                    "virtual": settled["virtual"],
                 },
-                "game_minutes": settled["game_minutes"],
-                "virtual_label": settled["virtual"]["label"],
-            },
-        )
+            )
+            if error_payload is not None:
+                yield sse("error", error_payload)
+            else:
+                yield sse(
+                    "done",
+                    {
+                        "message_id": settled["message_id"],
+                        "user_message_id": prepared["user_message_id"],
+                        "meta": {
+                            "attrs": settled["ai_changes"],
+                            "time_advance": settled["time_advance"],
+                        },
+                        "game_minutes": settled["game_minutes"],
+                        "virtual_label": settled["virtual"]["label"],
+                    },
+                )
+        except (asyncio.CancelledError, GeneratorExit):
+            if not settle_started:
+                if collected or stripper.tag_found:
+                    _settle_in_thread(
+                        save_id, "".join(collected), stripper.state_raw, prepared
+                    )
+                else:
+                    _drop_message_in_thread(save_id, prepared["user_message_id"])
+            raise
+    finally:
+        end_chat(save_id)
 
 
 @router.post("/api/saves/{save_id}/chat")
@@ -422,7 +458,13 @@ async def chat(save_id: int, req: ChatIn, background: BackgroundTasks):
     message = req.message.strip()
     if not message:
         error("empty_message", "消息不能为空", 400)
-    prepared = await run_in_threadpool(_prepare, save_id, message)
+    if not begin_chat(save_id):
+        error("chat_busy", "正在生成回复，请稍后再试", 409)
+    try:
+        prepared = await run_in_threadpool(_prepare, save_id, message)
+    except Exception:
+        end_chat(save_id)
+        raise
     return StreamingResponse(
         _stream_events(save_id, prepared, background),
         media_type="text/event-stream",

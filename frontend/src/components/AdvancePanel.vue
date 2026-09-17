@@ -2,17 +2,17 @@
   <section class="card panel">
     <h3>推进时间</h3>
     <div class="grid">
-      <button class="btn small" :disabled="busy" @click="run({ minutes: 10 })">+10 分</button>
-      <button class="btn small" :disabled="busy" @click="run({ minutes: 60 })">+1 时</button>
-      <button class="btn small" :disabled="busy" @click="run({ minutes: 1440 })">+1 天</button>
+      <button class="btn small" :disabled="locked" @click="run({ minutes: 10 })">+10 分</button>
+      <button class="btn small" :disabled="locked" @click="run({ minutes: 60 })">+1 时</button>
+      <button class="btn small" :disabled="locked" @click="run({ minutes: 1440 })">+1 天</button>
     </div>
     <div class="jump">
-      <select v-model="period" :disabled="busy">
+      <select v-model="period" :disabled="locked">
         <option v-for="item in periods" :key="item.key" :value="item.key">
           {{ item.name }}
         </option>
       </select>
-      <button class="btn small" :disabled="busy" @click="run({ period })">
+      <button class="btn small" :disabled="locked" @click="run({ period })">
         跳到该时段
       </button>
     </div>
@@ -20,8 +20,9 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { computed, ref } from "vue";
 
+import { useChatStore } from "../stores/chat";
 import { useGameStore } from "../stores/game";
 import { useUiStore } from "../stores/ui";
 
@@ -31,8 +32,10 @@ const props = defineProps({
 const emit = defineEmits(["advanced"]);
 
 const game = useGameStore();
+const chat = useChatStore();
 const ui = useUiStore();
 const busy = ref(false);
+const locked = computed(() => busy.value || chat.streaming);
 const period = ref("night");
 
 const periods = [
@@ -46,7 +49,7 @@ const periods = [
 ];
 
 async function run(payload) {
-  if (busy.value) return;
+  if (locked.value) return;
   busy.value = true;
   try {
     const data = await game.advance(props.saveId, payload);

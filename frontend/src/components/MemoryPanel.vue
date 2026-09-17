@@ -88,7 +88,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 
 import { apiDelete, apiGet, apiPatch, apiPost } from "../api/client";
 import { useUiStore } from "../stores/ui";
@@ -130,10 +130,14 @@ const kindLabel = (key) => KINDS.find((k) => k.key === key)?.label || key;
 const createdLabel = (value) => (value ? new Date(value).toLocaleString() : "");
 
 async function load() {
-  const data = await apiGet(`/api/saves/${props.saveId}/memories`);
-  items.value = data.memories || [];
-  unsummarized.value = data.unsummarized || 0;
-  job.value = data.job || null;
+  try {
+    const data = await apiGet(`/api/saves/${props.saveId}/memories`);
+    items.value = data.memories || [];
+    unsummarized.value = data.unsummarized || 0;
+    job.value = data.job || null;
+  } catch (e) {
+    ui.toast("error", e.message);
+  }
 }
 
 async function summarize() {
@@ -188,6 +192,17 @@ async function remove(item) {
     ui.toast("error", e.message);
   }
 }
+
+watch(
+  () => props.saveId,
+  () => {
+    items.value = [];
+    unsummarized.value = 0;
+    job.value = null;
+    notice.value = "";
+    load();
+  }
+);
 
 onMounted(load);
 </script>

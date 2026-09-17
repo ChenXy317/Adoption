@@ -7,7 +7,7 @@
         <span class="dim small">第 {{ (scene.turns || 0) + 1 }} 轮</span>
       </div>
       <div v-if="scene.goal" class="dim small goal">目标：{{ scene.goal }}</div>
-      <button class="btn small end" :disabled="busy" @click="endScene">
+      <button class="btn small end" :disabled="busy || chat.streaming" @click="endScene">
         结束当前场景
       </button>
     </template>
@@ -18,6 +18,7 @@
 <script setup>
 import { ref } from "vue";
 
+import { useChatStore } from "../stores/chat";
 import { useGameStore } from "../stores/game";
 import { useUiStore } from "../stores/ui";
 
@@ -28,11 +29,12 @@ const props = defineProps({
 const emit = defineEmits(["ended"]);
 
 const game = useGameStore();
+const chat = useChatStore();
 const ui = useUiStore();
 const busy = ref(false);
 
 async function endScene() {
-  if (busy.value) return;
+  if (busy.value || chat.streaming) return;
   busy.value = true;
   try {
     const data = await game.endScene(props.saveId, {});

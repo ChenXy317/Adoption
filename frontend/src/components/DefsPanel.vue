@@ -157,11 +157,15 @@ import { computed, onMounted, reactive, ref } from "vue";
 
 import { apiDelete, apiGet, apiPatch, apiPost } from "../api/client";
 import CharacterEditor from "./CharacterEditor.vue";
+import { useChatStore } from "../stores/chat";
+import { useGameStore } from "../stores/game";
 import { useUiStore } from "../stores/ui";
 
 defineEmits(["close"]);
 
 const ui = useUiStore();
+const game = useGameStore();
+const chat = useChatStore();
 const tab = ref("events");
 const items = ref([]);
 const saves = ref([]);
@@ -399,10 +403,14 @@ async function debugTrigger() {
   error.value = "";
   busy.value = true;
   try {
-    await apiPost(
+    const data = await apiPost(
       `/api/saves/${debugSaveId.value}/events/${encodeURIComponent(selected.value.key)}/trigger?debug=true`
     );
     ui.toast("ok", `已对所选存档调试触发「${selected.value.name}」`);
+    if (Number(game.current?.save?.id) === Number(debugSaveId.value)) {
+      chat.pushMessages(data?.messages);
+      await game.loadState(debugSaveId.value);
+    }
   } catch (e) {
     error.value = e.message;
   } finally {
