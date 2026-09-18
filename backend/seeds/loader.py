@@ -36,7 +36,7 @@ def character_seed_fields(data: dict) -> dict:
     """女主角种子字段（装载与恢复共用）。"""
     return {
         "name": (data.get("name") or "").strip() or "她",
-        "age": max(18, _int(data.get("age"), 18)),
+        "age": max(14, _int(data.get("age"), 14)),
         "relation": (data.get("relation") or "").strip(),
         "persona": data.get("persona") or {},
         "freeform": data.get("freeform") or "",

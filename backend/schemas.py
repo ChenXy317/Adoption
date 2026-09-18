@@ -83,7 +83,7 @@ class CharacterPatch(BaseModel):
     """女主角设定书编辑；persona 为结构化设定内容。"""
 
     name: str | None = Field(default=None, min_length=1, max_length=64)
-    age: int | None = Field(default=None, ge=18, le=99)
+    age: int | None = Field(default=None, ge=1, le=99)
     relation: str | None = Field(default=None, max_length=64)
     persona: dict | None = None
     freeform: str | None = Field(default=None, max_length=20000)
