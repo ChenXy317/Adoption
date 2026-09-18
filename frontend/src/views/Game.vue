@@ -19,6 +19,14 @@
     <div class="body">
       <main class="chat card">
         <ChatStream :save-id="$route.params.id" />
+        <div class="model-bar" :class="{ missing: !hasModel }">
+          <SaveModelSelect
+            :save-id="$route.params.id"
+            :model-key="game.current?.save?.model_key || ''"
+            compact
+            @open-catalog="catalogOpen = true"
+          />
+        </div>
         <ChatInput :save-id="$route.params.id" />
       </main>
 
@@ -101,12 +109,14 @@ import DefsPanel from "../components/DefsPanel.vue";
 import EventPanel from "../components/EventPanel.vue";
 import MemoryPanel from "../components/MemoryPanel.vue";
 import ModelCatalogModal from "../components/ModelCatalogModal.vue";
+import SaveModelSelect from "../components/SaveModelSelect.vue";
 import SceneBanner from "../components/SceneBanner.vue";
 import SideDrawer from "../components/SideDrawer.vue";
 import SideNav from "../components/SideNav.vue";
 import StatusBars from "../components/StatusBars.vue";
 import ThemeModal from "../components/ThemeModal.vue";
 import WalletPanel from "../components/WalletPanel.vue";
+import { useCatalogStore } from "../stores/catalog";
 import { useChatStore } from "../stores/chat";
 import { useGameStore } from "../stores/game";
 import { useUiStore } from "../stores/ui";
@@ -118,6 +128,7 @@ const props = defineProps({
 const router = useRouter();
 const game = useGameStore();
 const chat = useChatStore();
+const catalog = useCatalogStore();
 const ui = useUiStore();
 const catalogOpen = ref(false);
 const memoryOpen = ref(false);
@@ -154,6 +165,8 @@ const navItems = computed(() => {
 });
 
 const drawerTitle = computed(() => (openDir.value ? DIR_META[openDir.value]?.label || "" : ""));
+
+const hasModel = computed(() => Boolean(game.current?.save?.model_key));
 
 const characterLine = computed(() => {
   const c = game.current?.character;
@@ -238,6 +251,11 @@ async function onSettled(data) {
 
 async function onCatalogClose() {
   catalogOpen.value = false;
+  try {
+    await catalog.loadModels();
+  } catch {
+    /* 关闭后刷新目录失败时仍继续拉存档状态 */
+  }
   await refresh();
 }
 </script>
@@ -343,6 +361,17 @@ html[data-theme="light"] .time {
   width: 100%;
   margin: 0 auto;
   position: relative;
+}
+
+.model-bar {
+  flex-shrink: 0;
+  padding: 8px 18px 6px;
+  border-top: 1px solid transparent;
+  background: color-mix(in srgb, var(--bg-soft) 70%, transparent);
+}
+
+.model-bar.missing {
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
 }
 
 .chat {
@@ -468,6 +497,10 @@ html[data-theme="light"] .chat {
     flex: 1;
     min-height: 0;
     border-radius: var(--radius-sm);
+  }
+
+  .model-bar {
+    padding: 8px 10px;
   }
 
   /* 功能条沉底：抽屉在上、导航在下 */

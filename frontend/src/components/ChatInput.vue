@@ -3,13 +3,13 @@
     <textarea
       v-model="text"
       rows="3"
-      placeholder="说点什么…（Enter 发送，Shift+Enter 换行）"
-      :disabled="chat.streaming"
+      :placeholder="placeholder"
+      :disabled="chat.streaming || !hasModel"
       @keydown.enter.exact.prevent="onEnter"
     ></textarea>
     <button
       class="btn primary"
-      :disabled="chat.streaming || !text.trim()"
+      :disabled="chat.streaming || !hasModel || !text.trim()"
       @click="send"
     >
       {{ chat.streaming ? "生成中…" : "发送" }}
@@ -18,20 +18,28 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { computed, ref } from "vue";
 
 import { useChatStore } from "../stores/chat";
+import { useGameStore } from "../stores/game";
 
 const props = defineProps({
   saveId: { type: [Number, String], required: true },
 });
 
 const chat = useChatStore();
+const game = useGameStore();
 const text = ref("");
+const hasModel = computed(() => Boolean(game.current?.save?.model_key));
+const placeholder = computed(() =>
+  hasModel.value
+    ? "说点什么…（Enter 发送，Shift+Enter 换行）"
+    : "请先为这个存档选择对话模型"
+);
 
 async function send() {
   const content = text.value.trim();
-  if (!content || chat.streaming) return;
+  if (!content || chat.streaming || !hasModel.value) return;
   text.value = "";
   const ok = await chat.send(props.saveId, content);
   if (!ok && !text.value) text.value = content;

@@ -14,7 +14,7 @@
       <div class="field">
         <label>对话模型</label>
         <select v-model="form.model_key">
-          <option value="">（暂不选择，稍后在模型配置中选择）</option>
+          <option value="">（暂不选择，进入存档后再选）</option>
           <option v-for="m in catalog.models" :key="m.key" :value="m.key">
             {{ m.provider_name }} / {{ m.display_name }}
           </option>

@@ -61,7 +61,12 @@
             <span class="dim small">{{ save.virtual_time }}</span>
             <span class="dim small">{{ save.message_count }} 条消息</span>
           </div>
-          <div v-if="!save.model_key" class="warn">未选择模型</div>
+          <SaveModelSelect
+            :save-id="save.id"
+            :model-key="save.model_key || ''"
+            compact
+            @open-catalog="catalogOpen = true"
+          />
         </div>
       </template>
     </main>
@@ -85,6 +90,7 @@ import { apiPost } from "../api/client";
 import DefsPanel from "../components/DefsPanel.vue";
 import ModelCatalogModal from "../components/ModelCatalogModal.vue";
 import SaveCreateModal from "../components/SaveCreateModal.vue";
+import SaveModelSelect from "../components/SaveModelSelect.vue";
 import ThemeModal from "../components/ThemeModal.vue";
 import { useCatalogStore } from "../stores/catalog";
 import { useGameStore } from "../stores/game";

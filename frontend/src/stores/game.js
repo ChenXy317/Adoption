@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 
-import { apiDelete, apiGet, apiPost } from "../api/client";
+import { apiDelete, apiGet, apiPatch, apiPost } from "../api/client";
 
 let stateAbort = null;
 
@@ -27,6 +27,16 @@ export const useGameStore = defineStore("game", {
     async deleteSave(id) {
       await apiDelete(`/api/saves/${id}`);
       this.saves = this.saves.filter((s) => s.id !== id);
+    },
+    async updateSave(id, payload) {
+      const save = await apiPatch(`/api/saves/${id}`, payload);
+      this.saves = this.saves.map((item) =>
+        item.id === save.id ? { ...item, ...save } : item
+      );
+      if (this.current?.save?.id === save.id) {
+        this.current.save = { ...this.current.save, ...save };
+      }
+      return save;
     },
     async loadState(id) {
       stateAbort?.abort();

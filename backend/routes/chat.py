@@ -62,7 +62,7 @@ def _prepare(save_id: int, message: str) -> dict:
         with save_settle_lock(save_id):
             save = get_save_or_error(session, save_id)
             if not save.model_key:
-                error("model_not_set", "该存档尚未选择模型，请先在「模型配置」中选择", 400)
+                error("model_not_set", "该存档尚未选择模型，请先为这个存档选择对话模型", 400)
             runtime = get_runtime(session, save.model_key)
             character = get_save_character(session, save)
             if character is None:
