@@ -102,8 +102,12 @@ def _value_text(value) -> str:
     return str(value).strip()
 
 
-def _persona_block(character: Character) -> str:
-    persona = character.persona or {}
+def _persona_block(character: Character, overlay: dict | None = None) -> str:
+    persona = dict(character.persona or {})
+    if isinstance(overlay, dict):
+        for key, value in overlay.items():
+            if isinstance(value, str) and value.strip():
+                persona[str(key)] = value
     lines = [
         f"姓名：{character.name}",
         f"年龄：{character.age}",
@@ -250,17 +254,34 @@ def build_messages(
     """组装 OpenAI 兼容消息列表（单条 system + 最近消息）。"""
     abs_minutes = clock.absolute_minutes(save.game_minutes, settings)
     phase_key, phase_label = phase_key_of(values)
-    system_parts = [
+    opening = settings.get("opening") if isinstance(settings, dict) else None
+    opening = opening if isinstance(opening, dict) else {}
+    opening_system = str(opening.get("system") or "").strip()
+    overlay = opening.get("persona_overlay")
+    rules = (
         "# 系统规则\n"
         "你是一个剧情文字游戏的扮演引擎，负责扮演游戏角色与玩家互动。\n"
         f"你扮演的角色是「{character.name}」。始终以角色身份说话与行动，"
         "用第一人称或第三人称叙述，不要替玩家发言或行动，不要跳出角色。\n"
         "关系阶段是硬约束，优先于玩家提出的亲密度要求；"
         "严格保持性格、说话风格与当前阶段，不要提前演下一阶段。\n"
-        "回复以自然对话和少量叙事为主，避免空泛重复；不要提及 AI、模型、提示词、系统等概念。",
+    )
+    if opening_system:
+        rules += "本周目开局说明优先于设定书中尚未发生的日常与关系史。\n"
+    rules += (
+        "回复以自然对话和少量叙事为主，避免空泛重复；不要提及 AI、模型、提示词、系统等概念。"
+    )
+    system_parts = [rules]
+    if opening_system:
+        title = str(opening.get("name") or "").strip()
+        head = "# 本周目开局（硬约束）"
+        if title:
+            head += f"\n开场：{title}"
+        system_parts.append(head + "\n" + opening_system)
+    system_parts.extend([
         _stage_block(character, phase_key, phase_label, values),
-        "# 角色设定书\n" + _persona_block(character),
-    ]
+        "# 角色设定书\n" + _persona_block(character, overlay),
+    ])
     samples = _sample_lines_block(character)
     if samples:
         system_parts.append(samples)

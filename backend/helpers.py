@@ -164,6 +164,26 @@ def sanitize_settings(raw, base: dict | None = None) -> dict:
     if "memory_model" in out and not isinstance(out["memory_model"], str):
         out["memory_model"] = ""
 
+    if "opening" in out:
+        raw_opening = out.get("opening")
+        prior_opening = prior.get("opening")
+        prior_opening = prior_opening if isinstance(prior_opening, dict) else {}
+        if not isinstance(raw_opening, dict):
+            out["opening"] = dict(prior_opening)
+        else:
+            overlay_in = raw_opening.get("persona_overlay")
+            overlay: dict[str, str] = {}
+            if isinstance(overlay_in, dict):
+                for key, value in list(overlay_in.items())[:16]:
+                    if isinstance(value, str) and value.strip():
+                        overlay[str(key)[:64]] = value.strip()[:4000]
+            out["opening"] = {
+                "key": str(raw_opening.get("key") or "")[:64],
+                "name": str(raw_opening.get("name") or "")[:64],
+                "system": str(raw_opening.get("system") or "")[:8000],
+                "persona_overlay": overlay,
+            }
+
     if "params" in out:
         raw_params = out.get("params")
         prior_params = prior.get("params")

@@ -5,7 +5,24 @@
       <h2>新建存档（新周目）</h2>
       <div class="card character-card">
         <div>{{ characterLine }}</div>
-        <div class="dim small">所有存档共用同一位女主角，新存档从头开始这段关系。</div>
+        <div class="dim small">所有存档共用同一位女主角。选择开场阶段后，关系从那个时刻开始。</div>
+      </div>
+      <div class="field">
+        <label>开场阶段</label>
+        <div class="opening-grid">
+          <button
+            v-for="item in openings"
+            :key="item.key"
+            type="button"
+            class="opening-card"
+            :class="{ active: form.opening_key === item.key }"
+            @click="form.opening_key = item.key"
+          >
+            <strong>{{ item.name }}</strong>
+            <span class="dim small meta">{{ item.time_label }} · {{ item.phase }}</span>
+            <span class="dim small blurb">{{ item.blurb }}</span>
+          </button>
+        </div>
       </div>
       <div class="field">
         <label>存档名</label>
@@ -35,6 +52,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
 
+import { apiGet } from "../api/client";
 import { useCatalogStore } from "../stores/catalog";
 import { useCharacterStore } from "../stores/character";
 import { useGameStore } from "../stores/game";
@@ -48,7 +66,8 @@ const ui = useUiStore();
 
 const saving = ref(false);
 const error = ref("");
-const form = reactive({ name: "", model_key: "" });
+const openings = ref([]);
+const form = reactive({ name: "", model_key: "", opening_key: "rain_night" });
 
 const characterLine = computed(() => {
   const ch = character.character;
@@ -58,8 +77,21 @@ const characterLine = computed(() => {
 
 onMounted(async () => {
   try {
-    if (!catalog.models.length) await catalog.loadModels();
-    if (!character.loaded) await character.load();
+    const jobs = [];
+    if (!catalog.models.length) jobs.push(catalog.loadModels());
+    if (!character.loaded) jobs.push(character.load());
+    jobs.push(
+      apiGet("/api/openings").then((data) => {
+        openings.value = Array.isArray(data) ? data : [];
+        if (
+          openings.value.length &&
+          !openings.value.some((item) => item.key === form.opening_key)
+        ) {
+          form.opening_key = openings.value[0].key;
+        }
+      })
+    );
+    await Promise.all(jobs);
   } catch (e) {
     error.value = e.message;
   }
@@ -76,6 +108,7 @@ async function submit() {
     const save = await game.createSave({
       name: form.name.trim(),
       model_key: form.model_key,
+      opening_key: form.opening_key,
     });
     ui.toast("ok", "存档已创建");
     emit("created", save);
@@ -114,6 +147,45 @@ async function submit() {
   font-weight: 600;
 }
 
+.opening-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.opening-card {
+  appearance: none;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--panel-2) 55%, transparent);
+  color: var(--text);
+  transition: border-color var(--ease), box-shadow var(--ease), background var(--ease);
+}
+
+.opening-card .meta {
+  letter-spacing: 0.02em;
+}
+
+.opening-card .blurb {
+  line-height: 1.5;
+}
+
+.opening-card:hover {
+  border-color: var(--accent-border);
+}
+
+.opening-card.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: var(--glow-soft);
+}
+
 .error {
   color: var(--danger);
   margin: 0 0 10px;
@@ -121,5 +193,15 @@ async function submit() {
 
 .small {
   font-size: 12px;
+}
+
+@media (max-width: 768px) {
+  .opening-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .opening-card {
+    min-height: 44px;
+  }
 }
 </style>

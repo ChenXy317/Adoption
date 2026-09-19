@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from config import TIME_MAX_JUMP_HOURS
 from db import get_session
-from game import clock, events
+from game import clock, conversation, events
 from helpers import (
     error,
     get_save_or_error,
@@ -77,20 +77,34 @@ def _advance_and_settle(session: Session, save: Save, delta: int, source: str) -
     settled = events.settle_time(
         session, save, defs, values, target_game, source=source
     )
-    new_abs = clock.absolute_minutes(save.game_minutes, settings)
-    note = None
-    if int(save.game_minutes) > old_game:
-        note = events.write_time_note(session, save)
+    rotated = conversation.after_action(
+        session,
+        save,
+        defs,
+        values,
+        time_moved=int(save.game_minutes) > old_game,
+        source=source,
+    )
     session.commit()
+    conversation.spawn_summary_if_needed(session, save.id, rotated["summarize"])
+    new_abs = clock.absolute_minutes(save.game_minutes, settings)
     virtual = {
         "absolute_minutes": new_abs,
         **clock.split(new_abs),
         "label": clock.time_label(new_abs),
     }
     changes = settled["ordered_changes"]
-    messages = list(settled["messages"])
-    if note is not None:
-        messages.append(_message_dict(note))
+    random_events = [
+        {
+            "key": item["key"],
+            "name": item["name"],
+            "category": item["category"],
+            "content": item["content"],
+            "message_id": item["message_id"],
+            "advance_minutes": item["advance_minutes"],
+        }
+        for item in rotated["random"]
+    ]
     return {
         "game_minutes": save.game_minutes,
         "advance_minutes": int(save.game_minutes) - old_game,
@@ -107,8 +121,10 @@ def _advance_and_settle(session: Session, save: Save, delta: int, source: str) -
                 "advance_minutes": item["advance_minutes"],
             }
             for item in settled["triggered"]
-        ],
-        "messages": messages,
+        ]
+        + random_events,
+        "messages": list(settled["messages"]) + list(rotated["messages"]),
+        "conversation_ended": rotated["ended"],
     }
 
 

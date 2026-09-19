@@ -266,6 +266,8 @@ _AI_FLAG_RESERVED = {
     "neglect",
     "mood_label",
     MOOD_LABEL_AT_FLAG,
+    "opening_at",
+    "conversation",
 }
 
 
@@ -544,6 +546,12 @@ def apply_neglect(
         return []
 
     fallback = clock.absolute_minutes(0, save.settings or {})
+    opening_row = session.get(SaveFlag, (save.id, "opening_at"))
+    if opening_row is not None:
+        try:
+            fallback = int(_raw_flag(opening_row.value))
+        except (TypeError, ValueError):
+            pass
     raw_last = session.scalar(
         select(func.max(Message.game_minutes_at)).where(
             Message.save_id == save.id,
@@ -714,7 +722,9 @@ def settle_time(
     skip_scene_enter: bool = False,
     exclude_events: set[str] | None = None,
 ) -> dict:
-    """推进到目标游戏分钟并结算：tick → 跨日随机判定 → 事件触发 → 场景生命周期。
+    """推进到目标游戏分钟并结算：tick → 跨日随机判定 → 固定事件触发 → 场景生命周期。
+
+    随机事件只在新对话开头注入（见 conversation.inject_due_random）。
 
     同一事务内完成，最终 commit 由调用方负责。values 会被就地更新为最终属性值。
     ordered_changes 按实际应用顺序记录全部属性变化（供前端按序覆盖）；
@@ -769,9 +779,6 @@ def settle_time(
             )
             pending_days = []
         candidates = _collect_fixed(
-            session, save, event_defs, values, since, triggered_ids, exclude
-        )
-        candidates += _collect_random_inject(
             session, save, event_defs, values, since, triggered_ids, exclude
         )
         if not candidates:

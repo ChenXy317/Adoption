@@ -8,13 +8,13 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from config import (
-    CALENDAR_DEFAULT,
     DEFAULT_PARAMS,
     TIME_DEFAULT_ADVANCE,
     TIME_MAX_ADVANCE_PER_MESSAGE,
 )
 from db import get_session
-from game import clock
+from game import clock, openings
+from game.attributes import clamp
 from helpers import (
     character_dict,
     drop_save_lock,
@@ -54,12 +54,29 @@ def save_summary(session: Session, save: Save, message_count: int | None = None)
     }
 
 
-def init_attribute_values(session: Session, save_id: int) -> None:
+def init_attribute_values(
+    session: Session, save_id: int, overrides: dict | None = None
+) -> None:
+    overrides = overrides if isinstance(overrides, dict) else {}
     defs = session.scalars(select(AttributeDef).where(AttributeDef.enabled.is_(True)))
     for d in defs:
+        raw = overrides.get(d.key, d.default_value)
+        try:
+            value = float(raw)
+        except (TypeError, ValueError):
+            value = d.default_value
         session.add(
-            AttributeValue(save_id=save_id, attr_key=d.key, value=d.default_value)
+            AttributeValue(
+                save_id=save_id,
+                attr_key=d.key,
+                value=clamp(value, d.min, d.max),
+            )
         )
+
+
+@router.get("/api/openings")
+def list_openings():
+    return openings.public_list()
 
 
 @router.get("/api/saves")
@@ -89,26 +106,37 @@ def create_save(req: SaveCreate, session: Session = Depends(get_session)):
         )
     if req.model_key:
         get_runtime(session, req.model_key)
+    opening = openings.get(req.opening_key)
+    if opening is None:
+        error("opening_not_found", "未知的开场阶段", 400)
     settings = {
-        "calendar": dict(CALENDAR_DEFAULT),
+        "calendar": openings.calendar_of(opening),
         "params": dict(DEFAULT_PARAMS),
         "content_prompt": "",
         "advance": {
             "default_minutes": TIME_DEFAULT_ADVANCE,
             "max_per_message": TIME_MAX_ADVANCE_PER_MESSAGE,
         },
+        "opening": openings.snapshot(opening),
     }
     if req.settings:
-        settings.update(sanitize_settings(req.settings))
+        settings.update(sanitize_settings(req.settings, base=settings))
+    try:
+        game_minutes = max(0, int(opening.get("game_minutes") or 0))
+    except (TypeError, ValueError):
+        game_minutes = 0
     save = Save(
         character_id=character.id,
         name=req.name.strip(),
         model_key=req.model_key,
+        game_minutes=game_minutes,
         settings=settings,
     )
     session.add(save)
     session.flush()
-    init_attribute_values(session, save.id)
+    init_attribute_values(session, save.id, opening.get("attrs"))
+    session.flush()
+    openings.apply(session, save, opening)
     session.commit()
     return save_summary(session, save)
 

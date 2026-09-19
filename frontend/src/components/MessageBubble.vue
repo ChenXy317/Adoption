@@ -1,5 +1,8 @@
 <template>
-  <div class="msg" :class="message.role">
+  <div
+    class="msg"
+    :class="[message.role, { narrative: isNarrative, divider: isDivider }]"
+  >
     <div v-if="withAvatar" class="avatar" aria-hidden="true">
       <span>{{ message.role === "assistant" ? "澄" : "我" }}</span>
     </div>
@@ -20,6 +23,15 @@ const props = defineProps({
 
 const withAvatar = computed(
   () => props.message.role === "assistant" || props.message.role === "user"
+);
+
+const isNarrative = computed(() => {
+  const kind = String(props.message?.meta?.kind || "");
+  return kind === "opening" || kind === "scene_start" || kind === "scene_end";
+});
+
+const isDivider = computed(
+  () => String(props.message?.meta?.kind || "") === "conversation_end"
 );
 
 const changeText = computed(() => {
@@ -148,6 +160,38 @@ html[data-theme="light"] .msg.user .bubble {
   font-size: 12px;
   text-align: center;
   backdrop-filter: blur(6px);
+}
+
+.msg.narrative .bubble {
+  max-width: 92%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  text-align: left;
+  line-height: 1.7;
+  font-size: 13px;
+}
+
+.msg.narrative .content {
+  display: block;
+}
+
+.msg.divider .bubble {
+  max-width: 100%;
+  padding: 4px 0 10px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  color: var(--text-dim);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-align: center;
+}
+
+.msg.divider .bubble::before,
+.msg.divider .bubble::after {
+  content: none;
 }
 
 .cursor {

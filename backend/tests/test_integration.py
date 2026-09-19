@@ -39,7 +39,7 @@ from config import (
     MYSQL_USER,
 )
 from db import Base
-from game import clock, events, memory, scenes
+from game import clock, conversation, events, memory, scenes
 import helpers
 from helpers import load_attr_values, save_settle_lock
 from orm import (
@@ -319,10 +319,14 @@ class SettlementIntegrationTest(unittest.TestCase):
 
         split = clock.split(clock.absolute_minutes(save.game_minutes, {}))
         self.assertEqual(split["day"], 2)
-        self.assertEqual([item["key"] for item in settled["triggered"]], ["rand_evt"])
+        self.assertEqual([item["key"] for item in settled["triggered"]], [])
         rolls = events.load_flags(session, save.id).get("random_rolls") or {}
         self.assertIn("rand_evt", rolls)
         self.assertTrue(rolls["rand_evt"]["hit"])
+
+        injected = conversation.inject_due_random(session, save, defs, values)
+        session.commit()
+        self.assertEqual([item["key"] for item in injected], ["rand_evt"])
 
     # ── 场景 ──
 
@@ -760,6 +764,49 @@ class SettlementIntegrationTest(unittest.TestCase):
         self.assertTrue(
             any("手机亮了一下" in item["content"] for item in data["messages"])
         )
+
+    def test_advance_ends_conversation_and_opens_with_random(self):
+        session = self._session()
+        defs = self._defs(session)
+        save, _values = self._save(session, defs)
+        save_id = save.id
+        session.add(
+            EventDef(
+                key="rand_open", name="窗边", category="random",
+                trigger={"chance": 1.0},
+                effects={"attrs": {"mood": 1}}, prompt_template="她在窗边站着。",
+                once=False, cooldown_minutes=0, priority=10, enabled=True,
+            )
+        )
+        session.add_all([
+            Message(save_id=save_id, role="user", content="早上好", game_minutes_at=0),
+            Message(save_id=save_id, role="assistant", content="……早。", game_minutes_at=0),
+        ])
+        session.commit()
+
+        data = advance_route.advance(
+            save_id, AdvanceIn(minutes=60), session=session
+        )
+        kinds = [(item.get("meta") or {}).get("kind") for item in data["messages"]]
+        self.assertIn("conversation_end", kinds)
+        self.assertTrue(data.get("conversation_ended"))
+        self.assertTrue(
+            any(item.get("key") == "rand_open" for item in data["events"])
+        )
+        after = conversation.started_after_id(session, save_id)
+        self.assertGreater(after, 0)
+        leftover = list(
+            session.scalars(
+                select(Message).where(
+                    Message.save_id == save_id,
+                    Message.id > after,
+                    Message.role == "user",
+                )
+            )
+        )
+        self.assertEqual(leftover, [])
+        job = session.scalar(select(MemoryJob).where(MemoryJob.save_id == save_id))
+        self.assertIsNotNone(job)
 
     # ── 对话结算与记忆 ──
 
@@ -1247,6 +1294,7 @@ class SettlementIntegrationTest(unittest.TestCase):
         self.assertEqual(row.settings["advance"]["max_per_message"], 1440)
         self.assertEqual(row.settings["advance"]["default_minutes"], 10)
         self.assertEqual(row.settings["calendar"]["month"], 12)
+        self.assertEqual(row.settings["opening"]["key"], "rain_night")
 
         saves_route.update_save(
             created["id"],
@@ -1260,6 +1308,50 @@ class SettlementIntegrationTest(unittest.TestCase):
         self.assertIn(created["id"], helpers._save_locks)
         saves_route.delete_save(created["id"], session=session)
         self.assertNotIn(created["id"], helpers._save_locks)
+
+    def test_create_save_applies_opening(self):
+        session = self._session()
+        defs = self._defs(session)
+        self._save(session, defs)
+        apply_scene_seeds(session)
+
+        created = saves_route.create_save(
+            SaveCreate(name="雨夜档", opening_key="rain_night"),
+            session=session,
+        )
+        save = session.get(Save, created["id"])
+        self.assertEqual(save.settings["opening"]["key"], "rain_night")
+        self.assertIn("第一个晚上", save.settings["opening"]["system"])
+        self.assertEqual(save.settings["calendar"]["hour"], 22)
+        self.assertEqual(load_attr_values(session, save.id)["trust"], 6.0)
+        flags = events.load_flags(session, save.id)
+        self.assertIsNotNone(flags.get("opening_at"))
+        messages = list(
+            session.scalars(select(Message).where(Message.save_id == save.id))
+        )
+        self.assertTrue(any((m.meta or {}).get("kind") == "opening" for m in messages))
+        active = scenes.get_active(session, save.id)
+        self.assertEqual(active["key"], "opening_rain_night")
+
+        later = saves_route.create_save(
+            SaveCreate(name="熟悉档", opening_key="settling_in"),
+            session=session,
+        )
+        save2 = session.get(Save, later["id"])
+        self.assertGreater(save2.game_minutes, 8000)
+        self.assertTrue(events.load_flags(session, save2.id).get("story_nightmare_done"))
+        data = advance_route.advance(
+            save2.id, AdvanceIn(minutes=10), session=session
+        )
+        sources = [item.get("source") for item in data.get("changes") or []]
+        self.assertNotIn("neglect", sources)
+
+        with self.assertRaises(HTTPException) as ctx:
+            saves_route.create_save(
+                SaveCreate(name="坏档", opening_key="nope"),
+                session=session,
+            )
+        self.assertEqual(ctx.exception.status_code, 400)
 
     def test_import_backup_sanitizes_settings(self):
         session = self._session()

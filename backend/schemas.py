@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, field_validator
 class SaveCreate(BaseModel):
     name: str = Field(min_length=1, max_length=128)
     model_key: str = Field(default="", max_length=192)
+    opening_key: str = Field(default="", max_length=64)
     settings: dict | None = None
 
     @field_validator("name")
@@ -20,6 +21,11 @@ class SaveCreate(BaseModel):
         if not text:
             raise ValueError("存档名不能为空")
         return text
+
+    @field_validator("opening_key")
+    @classmethod
+    def _strip_opening_key(cls, value: str) -> str:
+        return value.strip()
 
 
 class SaveUpdate(BaseModel):

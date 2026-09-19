@@ -9,6 +9,10 @@
           "type": "game_day",
           "op": ">=",
           "value": 1
+        },
+        {
+          "type": "period",
+          "in": ["dawn", "morning"]
         }
       ]
     },

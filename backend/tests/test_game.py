@@ -18,9 +18,10 @@ from game.prompt import (
     _sample_lines_block,
     _stage_block,
     _stage_note,
+    build_messages,
 )
 from game.tags import StateTagStripper, parse_state
-from orm import AttributeDef, Character
+from orm import AttributeDef, Character, Save
 
 
 def make_def(key, name="属性", lo=0, hi=100, default=0, ai_editable=True):
@@ -326,6 +327,47 @@ class PromptTest(unittest.TestCase):
         self.assertIn("flags", STATE_PROTOCOL)
         self.assertIn("scene", STATE_PROTOCOL)
         self.assertIn("克制", STATE_PROTOCOL)
+
+    def test_persona_overlay_replaces_fields(self):
+        character = self.make_character()
+        character.persona["daily_life"] = "每天会等你回家。"
+        text = _persona_block(
+            character, {"daily_life": "还没有日常。", "relationship_history": "今晚才遇见。"}
+        )
+        self.assertIn("日常：还没有日常。", text)
+        self.assertIn("与玩家的关系史：今晚才遇见。", text)
+        self.assertNotIn("每天会等你回家。", text)
+
+    def test_opening_injected_at_system_start(self):
+        character = self.make_character()
+        character.persona["daily_life"] = "每天会等你回家。"
+        character.persona["relationship_history"] = "你们已经认识很久。"
+        save = Save(
+            name="t",
+            game_minutes=0,
+            settings={
+                "opening": {
+                    "key": "rain_night",
+                    "name": "雨夜刚到家",
+                    "system": "今夜才刚把她带回家，禁止演已经同住的日常。",
+                    "persona_overlay": {
+                        "daily_life": "还没有日常。",
+                        "relationship_history": "今晚才遇见。",
+                    },
+                }
+            },
+        )
+        defs = [make_def("trust", "信任", default=6)]
+        system = build_messages(
+            save, character, defs, {"trust": 6}, [], save.settings
+        )[0]["content"]
+        self.assertIn("# 本周目开局（硬约束）", system)
+        self.assertLess(system.find("# 本周目开局"), system.find("# 角色设定书"))
+        self.assertIn("今夜才刚把她带回家", system)
+        self.assertIn("还没有日常。", system)
+        self.assertIn("今晚才遇见。", system)
+        self.assertNotIn("每天会等你回家。", system)
+        self.assertNotIn("你们已经认识很久。", system)
 
 
 if __name__ == "__main__":

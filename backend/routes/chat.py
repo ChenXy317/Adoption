@@ -19,7 +19,7 @@ from starlette.concurrency import run_in_threadpool
 from ai_client import AIClientError, ai
 from config import CHAT_HISTORY_MESSAGES, EVENT_RECENT_WINDOW_MINUTES
 from db import SessionLocal
-from game import clock, events, memory, scenes
+from game import clock, conversation, events, memory, scenes
 from game.attributes import apply_deltas, phase_of, tendency_of
 from game.prompt import build_messages
 from game.tags import StateTagStripper, parse_state
@@ -78,12 +78,13 @@ def _prepare(save_id: int, message: str) -> dict:
             session.add(user_msg)
             session.commit()
 
+            started_after = conversation.started_after_id(session, save_id)
+            history_query = select(Message).where(Message.save_id == save_id)
+            if started_after:
+                history_query = history_query.where(Message.id > started_after)
             history = list(
                 session.scalars(
-                    select(Message)
-                    .where(Message.save_id == save_id)
-                    .order_by(Message.id.desc())
-                    .limit(CHAT_HISTORY_MESSAGES)
+                    history_query.order_by(Message.id.desc()).limit(CHAT_HISTORY_MESSAGES)
                 )
             )
             history.reverse()

@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from db import get_session
-from game import clock, events
+from game import clock, conversation, events
 from game.attributes import apply_effects
 from helpers import (
     LOOPBACK_HOSTS,
@@ -18,19 +18,9 @@ from helpers import (
     require_chat_idle,
     save_settle_lock,
 )
-from orm import AttributeDef, EventDef, EventLog, Message
+from orm import AttributeDef, EventDef, EventLog
 
 router = APIRouter(tags=["events"])
-
-
-def _message_dict(message: Message) -> dict:
-    return {
-        "id": message.id,
-        "role": message.role,
-        "content": message.content,
-        "meta": message.meta or {},
-        "game_minutes_at": message.game_minutes_at,
-    }
 
 
 @router.get("/api/saves/{save_id}/events")
@@ -158,10 +148,16 @@ def trigger_manual(
             source=source,
             exclude_events={event.key},
         )
-        note = None
-        if int(save.game_minutes) > old_game:
-            note = events.write_time_note(session, save)
+        rotated = conversation.after_action(
+            session,
+            save,
+            defs,
+            values,
+            time_moved=int(save.game_minutes) > old_game,
+            source=source,
+        )
         session.commit()
+        conversation.spawn_summary_if_needed(session, save_id, rotated["summarize"])
 
         new_abs = clock.absolute_minutes(save.game_minutes, settings)
         virtual = {
@@ -170,9 +166,7 @@ def trigger_manual(
             "label": clock.time_label(new_abs),
         }
         changes = cost_changes + result["attrs"] + settled["ordered_changes"]
-        messages = [result["message"], *settled["messages"]]
-        if note is not None:
-            messages.append(_message_dict(note))
+        messages = [result["message"], *settled["messages"], *rotated["messages"]]
         return {
             "event": {
                 "key": result["key"],
@@ -196,6 +190,18 @@ def trigger_manual(
                     "advance_minutes": item["advance_minutes"],
                 }
                 for item in settled["triggered"]
+            ]
+            + [
+                {
+                    "key": item["key"],
+                    "name": item["name"],
+                    "category": item["category"],
+                    "content": item["content"],
+                    "message_id": item["message_id"],
+                    "advance_minutes": item["advance_minutes"],
+                }
+                for item in rotated["random"]
             ],
             "messages": messages,
+            "conversation_ended": rotated["ended"],
         }

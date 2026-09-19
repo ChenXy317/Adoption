@@ -291,10 +291,11 @@ def enter_scene(
     session.flush()
 
     opening = f"【{scene.name}】" + (scene.scene_prompt or "").strip()
+    opening_text = opening[:1200]
     message = Message(
         save_id=save.id,
         role="event",
-        content=opening[:500],
+        content=opening_text,
         meta={
             "scene_key": scene.key,
             "scene_name": scene.name,
@@ -311,7 +312,7 @@ def enter_scene(
         "goal": scene.goal or "",
         "turns": 0,
         "max_turns": active["max_turns"],
-        "content": opening[:500],
+        "content": opening_text,
         "log_id": log.id,
         "message_id": message.id,
         "message": _message_dict(message),
@@ -467,6 +468,8 @@ def available_scenes(session: Session, save: Save, values: dict[str, float]) -> 
     ctx = events.build_context(session, save, values)
     items = []
     for scene in scene_defs:
+        if (scene.category or "") == "opening":
+            continue
         since = max(0, now_abs - last_at[scene.key]) if scene.key in last_at else None
         ok, reason = scene_availability(
             scene, ctx, triggered=scene.key in done, minutes_since=since
@@ -515,6 +518,8 @@ def try_enter(
     ctx = events.build_context(session, save, values)
     rng = random.Random()
     for scene in scene_defs:
+        if not forced_key and (scene.category or "") == "opening":
+            continue
         since = max(0, now_abs - last_at[scene.key]) if scene.key in last_at else None
         ok, _reason = scene_availability(
             scene,

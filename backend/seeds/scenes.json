@@ -1,5 +1,117 @@
 [
   {
+    "key": "opening_rain_night",
+    "name": "雨夜刚到家",
+    "category": "opening",
+    "enter_trigger": {
+      "type": "flag",
+      "key": "opening_manual_only",
+      "value": true
+    },
+    "enter_cost": {},
+    "scene_prompt": "雨还在下。她刚被你带回这个家，站在玄关里，旧帆布包抱在胸前，衣服往下滴水，头发贴在颊侧。她不敢往里走，也不敢抬头看你太久，像在等一句「其实你可以走了」。沙发空着，灯只开了一盏。",
+    "goal": "让她在这个陌生的房间里稍微安下心，确认今晚可以留下来过夜。",
+    "min_turns": 3,
+    "max_turns": 8,
+    "exit": {},
+    "effects": {
+      "attrs": {
+        "mood": 6,
+        "trust": 1,
+        "vigilance": -4
+      }
+    },
+    "next_scenes": [],
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 0,
+    "enabled": true
+  },
+  {
+    "key": "opening_first_morning",
+    "name": "第一个早晨",
+    "category": "opening",
+    "enter_trigger": {
+      "type": "flag",
+      "key": "opening_manual_only",
+      "value": true
+    },
+    "enter_cost": {},
+    "scene_prompt": "雨停了。早晨的光从窗帘缝进来。她比你起得更早，局促地站在厨房门口，手指绞着衣角，眼下有淡青。沙发上的毯子叠得很整齐，像生怕自己占了地方。她小声问你需要她做些什么。",
+    "goal": "度过同住的第一个白天开头：让她明白她可以留下，不必用劳动换一张床。",
+    "min_turns": 3,
+    "max_turns": 8,
+    "exit": {},
+    "effects": {
+      "attrs": {
+        "mood": 4,
+        "trust": 1,
+        "vigilance": -3
+      }
+    },
+    "next_scenes": [],
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 0,
+    "enabled": true
+  },
+  {
+    "key": "opening_few_days",
+    "name": "住下几天",
+    "category": "opening",
+    "enter_trigger": {
+      "type": "flag",
+      "key": "opening_manual_only",
+      "value": true
+    },
+    "enter_cost": {},
+    "scene_prompt": "傍晚。屋里已经有一点她生活过的痕迹：洗干净的杯子倒扣着，地也拖过。她听见你回来，从厨房探出半个身子，先看你的脸色，才轻声说「你回来了」。饭在锅里温着，她不确定你几点进门。",
+    "goal": "在已经同住几天的傍晚里，让她再放松一点，愿意说今天做了什么。",
+    "min_turns": 3,
+    "max_turns": 8,
+    "exit": {},
+    "effects": {
+      "attrs": {
+        "mood": 3,
+        "affection": 1,
+        "trust": 1
+      }
+    },
+    "next_scenes": [],
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 0,
+    "enabled": true
+  },
+  {
+    "key": "opening_settling_in",
+    "name": "渐渐熟悉",
+    "category": "opening",
+    "enter_trigger": {
+      "type": "flag",
+      "key": "opening_manual_only",
+      "value": true
+    },
+    "enter_cost": {},
+    "scene_prompt": "一个普通的下午。她已经会在这个屋子里走来走去，不再只缩在沙发角。窗边放着她在看的书，你的杯子被洗好放回原处。你回来时她在门口附近，像等了有一会儿，看见你先轻轻吸了口气，才说「你回来了」。",
+    "goal": "在已经同住近一周的下午里，让她自然地分享一点今天的事，而不是只汇报家务。",
+    "min_turns": 3,
+    "max_turns": 8,
+    "exit": {},
+    "effects": {
+      "attrs": {
+        "mood": 3,
+        "affection": 1,
+        "dependence": 1
+      }
+    },
+    "next_scenes": [],
+    "once": true,
+    "cooldown_minutes": 0,
+    "priority": 0,
+    "enabled": true
+  },
+  {
     "key": "date_first_outing",
     "name": "第一次一起出门",
     "category": "story",

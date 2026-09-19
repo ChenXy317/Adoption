@@ -333,15 +333,40 @@ def _has_open_job(session: Session, save_id: int) -> bool:
     )
 
 
-def trigger_if_due(session: Session, save_id: int) -> bool:
-    """未总结消息达到阈值且无进行中的任务时，登记一个 pending 总结任务。"""
-    if count_unsummarized(session, save_id) < MEMORY_TRIGGER_TURNS:
+def count_unsummarized_dialogue(session: Session, save_id: int) -> int:
+    """未总结的玩家/角色对话条数。"""
+    save = session.get(Save, save_id)
+    if save is None:
+        return 0
+    return int(
+        session.scalar(
+            select(func.count(Message.id)).where(
+                Message.save_id == save_id,
+                Message.id > int(save.last_summarized_message_id or 0),
+                Message.role.in_(("user", "assistant")),
+            )
+        )
+        or 0
+    )
+
+
+def queue_summary(session: Session, save_id: int, *, force: bool = False) -> bool:
+    """登记一次总结任务。force 时只要有未总结对话即可，不等待条数阈值。"""
+    if force:
+        if count_unsummarized_dialogue(session, save_id) <= 0:
+            return False
+    elif count_unsummarized(session, save_id) < MEMORY_TRIGGER_TURNS:
         return False
     if _has_open_job(session, save_id):
         return False
     session.add(MemoryJob(save_id=save_id, status="pending"))
     session.commit()
     return True
+
+
+def trigger_if_due(session: Session, save_id: int) -> bool:
+    """未总结消息达到阈值且无进行中的任务时，登记一个 pending 总结任务。"""
+    return queue_summary(session, save_id, force=False)
 
 
 def requeue_interrupted(session: Session) -> list[int]:

@@ -31,7 +31,7 @@
       <div v-else-if="!game.saves.length" class="empty card">
         <div class="empty-icon" aria-hidden="true">◇</div>
         <p class="empty-title">还没有存档</p>
-        <p class="dim empty-desc">准备好开始这段关系了吗？所有存档共用同一位女主角，新存档从头开始。</p>
+        <p class="dim empty-desc">准备好开始这段关系了吗？所有存档共用同一位女主角，新存档可选开场阶段。</p>
         <button class="btn primary" @click="createOpen = true">开始</button>
       </div>
       <template v-else>
